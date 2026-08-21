@@ -3,8 +3,10 @@ using Spectre.Console;
 
 namespace OD.EditMediaInfo.Services;
 
+/// <summary>Provides the interactive terminal workflow for viewing and editing media files.</summary>
 public static class InteractiveEditor
 {
+    /// <summary>Runs the interactive editor until the user exits or cancels it.</summary>
     public static async Task<int> RunAsync(string? initialInput, CancellationToken ct)
     {
         var service = new MediaTagService();
@@ -16,7 +18,8 @@ public static class InteractiveEditor
             ct.ThrowIfCancellationRequested();
             Console.Clear();
             AnsiConsole.Write(new FigletText("odmedia").Color(Color.Cyan1));
-            AnsiConsole.MarkupLine("[grey]Media info — viewer & editor | leave empty to quit[/]");
+            var version = typeof(InteractiveEditor).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+            AnsiConsole.MarkupLine($"[grey]Version {Markup.Escape(version)} | Media info viewer & editor | leave empty to quit[/]");
 
             if (string.IsNullOrWhiteSpace(currentFile))
             {
@@ -107,7 +110,7 @@ public static class InteractiveEditor
                     try
                     {
                         service.Clear(currentFile, noBackup: false, keepMtime: false);
-                        AnsiConsole.MarkupLine("[green]All tags cleared (backup .bak created).[/]");
+                        AnsiConsole.MarkupLine("[green]All tags cleared (backup .bak available).[/]");
                     }
                     catch (Exception ex)
                     {
@@ -157,7 +160,7 @@ public static class InteractiveEditor
                 try
                 {
                     service.Save(new EditOptions { FilePath = currentFile, RemoveCover = true });
-                    AnsiConsole.MarkupLine("[green]Cover removed (backup .bak created).[/]");
+                    AnsiConsole.MarkupLine("[green]Cover removed (backup .bak available).[/]");
                 }
                 catch (Exception ex)
                 {
@@ -201,7 +204,7 @@ public static class InteractiveEditor
                 if (!confirm) continue;
 
                 service.Save(edit);
-                AnsiConsole.MarkupLine("[green]Saved (backup .bak created).[/]");
+                AnsiConsole.MarkupLine("[green]Saved (backup .bak available).[/]");
                 AnsiConsole.MarkupLine("[grey]Press any key to continue...[/]");
                 try { Console.ReadKey(true); } catch { Console.ReadLine(); }
             }
@@ -334,7 +337,7 @@ public static class InteractiveEditor
         "Comment",
         "Copyright",
         "Publisher",
-        "Cover (attention à la taille ! max 10 MB)"
+        "Cover (warning: max. 10 MB)"
     };
 
     private static async Task HandlePresetCreateFromFileAsync(string currentFile, MediaInfo info)
@@ -343,7 +346,7 @@ public static class InteractiveEditor
         {
             var selected = AnsiConsole.Prompt(
                 new MultiSelectionPrompt<string>()
-                    .Title("Champs à inclure dans le preset ? [grey](espace pour cocher, Entrée pour valider)[/]")
+                    .Title("Fields to include in the preset [grey](Space to select, Enter to confirm)[/]")
                     .PageSize(14)
                     .Required()
                     .AddChoices(PresetFieldChoices));
@@ -356,7 +359,7 @@ public static class InteractiveEditor
                 switch (field)
                 {
                     case "Artist":
-                        tags.Artists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Artist(s) [grey]; séparés par ;[/]:").DefaultValue(string.Join("; ", info.Artists)).AllowEmpty()));
+                        tags.Artists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Artist(s) [grey]; separated[/]:").DefaultValue(string.Join("; ", info.Artists)).AllowEmpty()));
                         if (tags.Artists.Length == 0) tags.Artists = null;
                         break;
                     case "Album":
@@ -364,21 +367,21 @@ public static class InteractiveEditor
                         if (string.IsNullOrWhiteSpace(tags.Album)) tags.Album = null;
                         break;
                     case "Album Artist":
-                        tags.AlbumArtists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Album Artist(s) [grey]; séparés par ;[/]:").DefaultValue(string.Join("; ", info.AlbumArtists)).AllowEmpty()));
+                        tags.AlbumArtists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Album Artist(s) [grey]; separated[/]:").DefaultValue(string.Join("; ", info.AlbumArtists)).AllowEmpty()));
                         if (tags.AlbumArtists.Length == 0) tags.AlbumArtists = null;
                         break;
                     case "Genre":
-                        tags.Genres = Split(AnsiConsole.Prompt(new TextPrompt<string>("Genre(s) [grey]; séparés par ;[/]:").DefaultValue(string.Join("; ", info.Genres)).AllowEmpty()));
+                        tags.Genres = Split(AnsiConsole.Prompt(new TextPrompt<string>("Genre(s) [grey]; separated[/]:").DefaultValue(string.Join("; ", info.Genres)).AllowEmpty()));
                         if (tags.Genres.Length == 0) tags.Genres = null;
                         break;
                     case "Year":
                         var yStr = AnsiConsole.Prompt(new TextPrompt<string>("Year:").DefaultValue(info.Year == 0 ? "" : info.Year.ToString()).AllowEmpty()).Trim();
                         if (string.IsNullOrWhiteSpace(yStr)) tags.Year = null;
                         else if (uint.TryParse(yStr, out var y)) tags.Year = y;
-                        else throw new InvalidOperationException("Année invalide");
+                        else throw new InvalidOperationException("Invalid year.");
                         break;
                     case "Composer":
-                        tags.Composers = Split(AnsiConsole.Prompt(new TextPrompt<string>("Composer(s) [grey]; séparés par ;[/]:").DefaultValue(string.Join("; ", info.Composers)).AllowEmpty()));
+                        tags.Composers = Split(AnsiConsole.Prompt(new TextPrompt<string>("Composer(s) [grey]; separated[/]:").DefaultValue(string.Join("; ", info.Composers)).AllowEmpty()));
                         if (tags.Composers.Length == 0) tags.Composers = null;
                         break;
                     case "Comment":
@@ -393,7 +396,7 @@ public static class InteractiveEditor
                         tags.Publisher = AnsiConsole.Prompt(new TextPrompt<string>("Publisher:").DefaultValue(info.Publisher).AllowEmpty());
                         if (string.IsNullOrWhiteSpace(tags.Publisher)) tags.Publisher = null;
                         break;
-                    case "Cover (attention à la taille ! max 10 MB)":
+                    case "Cover (warning: max. 10 MB)":
                         cover = await PromptCoverForPresetAsync(info);
                         break;
                 }
@@ -401,22 +404,22 @@ public static class InteractiveEditor
 
             if (tags.IsEmpty && cover is null)
             {
-                ErrorHandler.FailInteractive("Aucun champ sélectionné — preset annulé.");
+                ErrorHandler.FailInteractive("No fields were selected. Preset creation was cancelled.");
                 return;
             }
 
-            var name = AnsiConsole.Ask<string>("Nom du preset [grey](max 64 chars)[/]:");
+            var name = AnsiConsole.Ask<string>("Preset name [grey](max. 64 characters)[/]:");
             name = name.Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
-                ErrorHandler.FailInteractive("Nom vide — annulé.");
+                ErrorHandler.FailInteractive("Preset name cannot be empty. Creation was cancelled.");
                 return;
             }
 
             var safe = PresetService.SanitizeName(name);
             if (PresetService.Exists(safe))
             {
-                if (!AnsiConsole.Confirm($"Un preset \"{Markup.Escape(safe)}\" existe déjà. Écraser ?", false))
+                if (!AnsiConsole.Confirm($"Preset \"{Markup.Escape(safe)}\" already exists. Overwrite it?", false))
                     return;
             }
 
@@ -429,17 +432,17 @@ public static class InteractiveEditor
                 Cover = cover
             };
 
-            PresetService.Save(preset);
+            PresetService.Save(preset, overwrite: true);
             var bytesInfo = cover is not null ? $" [grey](cover {PresetService.GetCoverByteLength(cover) / 1024} KB)[/]" : "";
-            AnsiConsole.MarkupLine($"[green]Preset créé:[/] {Markup.Escape(safe)}[grey] -> {Markup.Escape(PresetService.GetPresetPath(safe))}[/]{bytesInfo}");
+            AnsiConsole.MarkupLine($"[green]Preset created:[/] {Markup.Escape(safe)}[grey] -> {Markup.Escape(PresetService.GetPresetPath(safe))}[/]{bytesInfo}");
             if (cover is not null && PresetService.GetCoverByteLength(cover) > 5 * 1024 * 1024)
-                AnsiConsole.MarkupLine("[yellow]Attention à la taille ! Cover > 5 MB[/]");
+                AnsiConsole.MarkupLine("[yellow]Warning: cover is larger than 5 MB.[/]");
         }
         catch (Exception ex)
         {
             ErrorHandler.FailInteractive(ex.Message);
         }
-        AnsiConsole.MarkupLine("[grey]Appuyez sur une touche pour continuer...[/]");
+        AnsiConsole.MarkupLine("[grey]Press any key to continue...[/]");
         try { Console.ReadKey(true); } catch { Console.ReadLine(); }
     }
 
@@ -449,7 +452,7 @@ public static class InteractiveEditor
         {
             var selected = AnsiConsole.Prompt(
                 new MultiSelectionPrompt<string>()
-                    .Title("Champs à inclure dans le preset (from scratch) ? [grey](espace pour cocher)[/]")
+                    .Title("Fields to include in the new preset [grey](Space to select)[/]")
                     .PageSize(14)
                     .Required()
                     .AddChoices(PresetFieldChoices));
@@ -462,7 +465,7 @@ public static class InteractiveEditor
                 switch (field)
                 {
                     case "Artist":
-                        tags.Artists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Artist(s) [grey]; séparés par ;[/]:").AllowEmpty()));
+                        tags.Artists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Artist(s) [grey]; separated[/]:").AllowEmpty()));
                         if (tags.Artists.Length == 0) tags.Artists = null;
                         break;
                     case "Album":
@@ -470,21 +473,21 @@ public static class InteractiveEditor
                         if (string.IsNullOrWhiteSpace(tags.Album)) tags.Album = null;
                         break;
                     case "Album Artist":
-                        tags.AlbumArtists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Album Artist(s) [grey]; séparés par ;[/]:").AllowEmpty()));
+                        tags.AlbumArtists = Split(AnsiConsole.Prompt(new TextPrompt<string>("Album Artist(s) [grey]; separated[/]:").AllowEmpty()));
                         if (tags.AlbumArtists.Length == 0) tags.AlbumArtists = null;
                         break;
                     case "Genre":
-                        tags.Genres = Split(AnsiConsole.Prompt(new TextPrompt<string>("Genre(s) [grey]; séparés par ;[/]:").AllowEmpty()));
+                        tags.Genres = Split(AnsiConsole.Prompt(new TextPrompt<string>("Genre(s) [grey]; separated[/]:").AllowEmpty()));
                         if (tags.Genres.Length == 0) tags.Genres = null;
                         break;
                     case "Year":
                         var yStr = AnsiConsole.Prompt(new TextPrompt<string>("Year:").AllowEmpty()).Trim();
                         if (string.IsNullOrWhiteSpace(yStr)) tags.Year = null;
                         else if (uint.TryParse(yStr, out var y)) tags.Year = y;
-                        else throw new InvalidOperationException("Année invalide");
+                        else throw new InvalidOperationException("Invalid year.");
                         break;
                     case "Composer":
-                        tags.Composers = Split(AnsiConsole.Prompt(new TextPrompt<string>("Composer(s) [grey]; séparés par ;[/]:").AllowEmpty()));
+                        tags.Composers = Split(AnsiConsole.Prompt(new TextPrompt<string>("Composer(s) [grey]; separated[/]:").AllowEmpty()));
                         if (tags.Composers.Length == 0) tags.Composers = null;
                         break;
                     case "Comment":
@@ -499,7 +502,7 @@ public static class InteractiveEditor
                         tags.Publisher = AnsiConsole.Prompt(new TextPrompt<string>("Publisher:").AllowEmpty());
                         if (string.IsNullOrWhiteSpace(tags.Publisher)) tags.Publisher = null;
                         break;
-                    case "Cover (attention à la taille ! max 10 MB)":
+                    case "Cover (warning: max. 10 MB)":
                         cover = await PromptCoverForPresetAsync(null);
                         break;
                 }
@@ -507,21 +510,21 @@ public static class InteractiveEditor
 
             if (tags.IsEmpty && cover is null)
             {
-                ErrorHandler.FailInteractive("Aucun champ — annulé.");
+                ErrorHandler.FailInteractive("No fields were selected. Preset creation was cancelled.");
                 return;
             }
 
-            var name = AnsiConsole.Ask<string>("Nom du preset [grey](max 64 chars)[/]:");
+            var name = AnsiConsole.Ask<string>("Preset name [grey](max. 64 characters)[/]:");
             name = name.Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
-                ErrorHandler.FailInteractive("Nom vide — annulé.");
+                ErrorHandler.FailInteractive("Preset name cannot be empty. Creation was cancelled.");
                 return;
             }
             var safe = PresetService.SanitizeName(name);
             if (PresetService.Exists(safe))
             {
-                if (!AnsiConsole.Confirm($"Un preset \"{Markup.Escape(safe)}\" existe déjà. Écraser ?", false))
+                if (!AnsiConsole.Confirm($"Preset \"{Markup.Escape(safe)}\" already exists. Overwrite it?", false))
                     return;
             }
 
@@ -533,17 +536,17 @@ public static class InteractiveEditor
                 Tags = tags,
                 Cover = cover
             };
-            PresetService.Save(preset);
+            PresetService.Save(preset, overwrite: true);
             var bytesInfo = cover is not null ? $" [grey](cover {PresetService.GetCoverByteLength(cover) / 1024} KB)[/]" : "";
-            AnsiConsole.MarkupLine($"[green]Preset créé:[/] {Markup.Escape(safe)}[grey] -> {Markup.Escape(PresetService.GetPresetPath(safe))}[/]{bytesInfo}");
+            AnsiConsole.MarkupLine($"[green]Preset created:[/] {Markup.Escape(safe)}[grey] -> {Markup.Escape(PresetService.GetPresetPath(safe))}[/]{bytesInfo}");
             if (cover is not null && PresetService.GetCoverByteLength(cover) > 5 * 1024 * 1024)
-                AnsiConsole.MarkupLine("[yellow]Attention à la taille ! Cover > 5 MB[/]");
+                AnsiConsole.MarkupLine("[yellow]Warning: cover is larger than 5 MB.[/]");
         }
         catch (Exception ex)
         {
             ErrorHandler.FailInteractive(ex.Message);
         }
-        AnsiConsole.MarkupLine("[grey]Appuyez sur une touche pour continuer...[/]");
+        AnsiConsole.MarkupLine("[grey]Press any key to continue...[/]");
         try { Console.ReadKey(true); } catch { Console.ReadLine(); }
     }
 
@@ -551,7 +554,7 @@ public static class InteractiveEditor
     {
         if (info is not null && info.Pictures.Count > 0)
         {
-            var useSource = AnsiConsole.Confirm($"Utiliser la cover du fichier courant ? [grey]({info.Pictures.Count} cover(s))[/]", true);
+            var useSource = AnsiConsole.Confirm($"Use the current file cover? [grey]({info.Pictures.Count} cover(s))[/]", true);
             if (useSource)
             {
                 var c = PresetService.CoverFromMediaInfo(info);
@@ -560,21 +563,21 @@ public static class InteractiveEditor
                     var len = PresetService.GetCoverByteLength(c);
                     AnsiConsole.MarkupLine($"[grey]Cover source: {len / 1024} KB, {Markup.Escape(c.MimeType)}[/]");
                     if (len > 5 * 1024 * 1024)
-                        AnsiConsole.MarkupLine("[yellow]Attention à la taille ! Cover > 5 MB[/]");
+                        AnsiConsole.MarkupLine("[yellow]Warning: cover is larger than 5 MB.[/]");
                     if (len > 10L * 1024 * 1024)
-                        throw new InvalidOperationException("Cover trop volumineuse (>10 MB)");
+                        throw new InvalidOperationException("Cover is too large (more than 10 MB).");
                 }
                 return Task.FromResult(c);
             }
         }
 
-        var path = AnsiConsole.Prompt(new TextPrompt<string>("Chemin image cover [grey](jpg/png/webp/bmp, max 10 MB, vide = annuler)[/]:").AllowEmpty());
+        var path = AnsiConsole.Prompt(new TextPrompt<string>("Cover image path [grey](JPG/PNG/WebP/BMP, max. 10 MB, empty to cancel)[/]:").AllowEmpty());
         path = path.Trim().Trim('"');
         if (string.IsNullOrWhiteSpace(path)) return Task.FromResult<PresetCover?>(null);
-        if (!File.Exists(path)) throw new FileNotFoundException($"Cover introuvable: \"{path}\"");
+        if (!File.Exists(path)) throw new FileNotFoundException($"Cover file not found: \"{path}\"");
         var fi = new FileInfo(path);
-        if (fi.Length > 10L * 1024 * 1024) throw new InvalidOperationException($"Cover trop volumineuse ({fi.Length / (1024.0 * 1024):F1} MB > 10 MB)");
-        if (fi.Length > 5 * 1024 * 1024) AnsiConsole.MarkupLine("[yellow]Attention à la taille ! Cover > 5 MB[/]");
+        if (fi.Length > 10L * 1024 * 1024) throw new InvalidOperationException($"Cover is too large ({fi.Length / (1024.0 * 1024):F1} MB > 10 MB).");
+        if (fi.Length > 5 * 1024 * 1024) AnsiConsole.MarkupLine("[yellow]Warning: cover is larger than 5 MB.[/]");
         var cover = PresetService.CoverFromFile(path);
         return Task.FromResult<PresetCover?>(cover);
     }
@@ -586,13 +589,13 @@ public static class InteractiveEditor
             var names = PresetService.List();
             if (names.Count == 0)
             {
-                ErrorHandler.FailInteractive($"Aucun preset trouvé dans {PresetService.GetPresetDirectory()}");
+                ErrorHandler.FailInteractive($"No presets found in {PresetService.GetPresetDirectory()}");
                 return Task.CompletedTask;
             }
 
             var chosen = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("Choisir le preset à appliquer :")
+                    .Title("Choose a preset to apply:")
                     .PageSize(12)
                     .AddChoices(names));
 
@@ -616,14 +619,14 @@ public static class InteractiveEditor
             if (preset.Cover is not null) preview.AddRow("Cover", $"{PresetService.GetCoverByteLength(preset.Cover) / 1024} KB {Markup.Escape(preset.Cover.MimeType)} [yellow]attention taille[/]");
             AnsiConsole.Write(preview);
 
-            if (!AnsiConsole.Confirm($"Appliquer ce preset à \"{Markup.Escape(currentFile)}\" ?", true))
+            if (!AnsiConsole.Confirm($"Apply this preset to \"{Markup.Escape(currentFile)}\"?", true))
                 return Task.CompletedTask;
 
             var opts = PresetService.ToEditOptions(preset, currentFile);
             try
             {
                 svc.Save(opts);
-                AnsiConsole.MarkupLine("[green]Preset appliqué (backup .bak créé).[/]");
+                AnsiConsole.MarkupLine("[green]Preset applied (backup .bak available).[/]");
             }
             finally
             {
@@ -634,7 +637,7 @@ public static class InteractiveEditor
         {
             ErrorHandler.FailInteractive(ex.Message);
         }
-        AnsiConsole.MarkupLine("[grey]Appuyez sur une touche pour continuer...[/]");
+        AnsiConsole.MarkupLine("[grey]Press any key to continue...[/]");
         try { Console.ReadKey(true); } catch { Console.ReadLine(); }
         return Task.CompletedTask;
     }
@@ -648,8 +651,8 @@ public static class InteractiveEditor
             var names = PresetService.List();
             if (names.Count == 0)
             {
-                AnsiConsole.MarkupLine("[grey]Aucun preset.[/]");
-                AnsiConsole.MarkupLine("[grey]Appuyez sur une touche pour revenir...[/]");
+                AnsiConsole.MarkupLine("[grey]No presets found.[/]");
+                AnsiConsole.MarkupLine("[grey]Press any key to return...[/]");
                 try { Console.ReadKey(true); } catch { Console.ReadLine(); }
                 return Task.CompletedTask;
             }
@@ -691,17 +694,17 @@ public static class InteractiveEditor
 
             var action = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("Action ?")
-                    .AddChoices(new[] { "Voir détail", "Supprimer", "Retour" }));
+                    .Title("Action?")
+                    .AddChoices(new[] { "View details", "Delete", "Back" }));
 
-            if (action == "Retour") return Task.CompletedTask;
+            if (action == "Back") return Task.CompletedTask;
 
             var chosen = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("Choisir preset :")
+                    .Title("Choose a preset:")
                     .AddChoices(names));
 
-            if (action == "Voir détail")
+            if (action == "View details")
             {
                 try
                 {
@@ -727,23 +730,23 @@ public static class InteractiveEditor
                 {
                     ErrorHandler.FailInteractive(ex.Message);
                 }
-                AnsiConsole.MarkupLine("[grey]Appuyez sur une touche...[/]");
+                AnsiConsole.MarkupLine("[grey]Press any key...[/]");
                 try { Console.ReadKey(true); } catch { Console.ReadLine(); }
             }
-            else if (action == "Supprimer")
+            else if (action == "Delete")
             {
-                if (AnsiConsole.Confirm($"Supprimer \"{Markup.Escape(chosen)}\" ?", false))
+                if (AnsiConsole.Confirm($"Delete \"{Markup.Escape(chosen)}\"?", false))
                 {
                     try
                     {
                         PresetService.Delete(chosen);
-                        AnsiConsole.MarkupLine("[green]Supprimé.[/]");
+                        AnsiConsole.MarkupLine("[green]Deleted.[/]");
                     }
                     catch (Exception ex)
                     {
                         ErrorHandler.FailInteractive(ex.Message);
                     }
-                    AnsiConsole.MarkupLine("[grey]Appuyez sur une touche...[/]");
+                    AnsiConsole.MarkupLine("[grey]Press any key...[/]");
                     try { Console.ReadKey(true); } catch { Console.ReadLine(); }
                 }
             }

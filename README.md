@@ -39,9 +39,10 @@ odmedia set track.mp3 --cover cover.jpg
 odmedia set track.mp3 --remove-cover
 odmedia set track.mp3 --title "T" --cover cover.jpg --no-backup --keep-mtime --dry-run
 
-# Presets (empreintes) — stored in <exeDir>/presets/*.json
+# Presets — stored in <exeDir>/presets/*.json
 odmedia preset save track.mp3 --name "MonLabel"                          # from file, checkbox-filtered in interactive, auto-all in CLI
 odmedia preset save --name "MonLabel" --artist "John" --genre "Rock" --copyright "©2024" --publisher "Label" --cover cover.jpg
+odmedia preset save track.mp3 --name "MonLabel" --force                  # overwrite an existing preset
 odmedia preset list
 odmedia preset show "MonLabel" --json
 odmedia preset apply other.mp3 --name "MonLabel" --dry-run
@@ -89,10 +90,10 @@ Exit codes: `0 OK`, `1 args/file`, `2 tag error`, `130 cancelled Ctrl+C`.
 
 ### Presets
 
-* Location: strictly `<exeDir>/presets/*.json` (created on demand). If not writable → clean error.
+* Location: `<exeDir>/presets/*.json` by default (created on demand). Set `ODMEDIA_PRESET_DIR` to use a different preset folder.
 * Interactive: file → menu `Preset — Create from this file` (multi-select checkboxes per field) / `Create from scratch` / `Apply to this file` / `Manage (list/delete)`.
 * Generic fields only: `Artist, Album, AlbumArtist, Genre, Year, Composer, Comment, Copyright, Publisher, Cover(optional)` — `Title/Track/Disc` excluded by design. `EncodedBy` not available via TagLibSharp 2.3.0 and therefore not included.
-* Cover optional with `[yellow]Attention à la taille ! max 10 MB[/]` warning; checked field proposes source cover or external file.
+* Cover is optional and limited to 10 MB; the interactive workflow warns when it exceeds 5 MB.
 
 ### `info` options
 
@@ -103,8 +104,8 @@ Exit codes: `0 OK`, `1 args/file`, `2 tag error`, `130 cancelled Ctrl+C`.
 ## Build
 
 ```powershell
-dotnet build src/OD.EditMediaInfo -c Release -r win-x64
-dotnet publish src/OD.EditMediaInfo -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish
+dotnet build src/OD.EditMediaInfo -c Release -r win-x64 -m:1
+dotnet publish src/OD.EditMediaInfo -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish -m:1
 .\publish\odmedia.exe --help
 ```
 
@@ -114,7 +115,7 @@ Prerequisites: .NET SDK 10.0.400, Spectre.Console 0.49.1, TagLibSharp 2.3.0
 
 ```
 src/OD.EditMediaInfo/
-  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile, v1.2.0)
+  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile, v1.3.0)
   Program.cs (dispatch + interactive detection)
   Commands/InfoCommand, SetCommand, ClearCommand, PresetCommand
   Services/IMediaTagService, MediaTagService, MediaProbeService, InteractiveEditor, PresetService, ErrorHandler

@@ -3,6 +3,9 @@ using OD.EditMediaInfo.Models;
 
 namespace OD.EditMediaInfo.Services;
 
+/// <summary>
+/// Creates, validates, and persists reusable media-tag presets.
+/// </summary>
 public static class PresetService
 {
     private const long MaxCoverBytes = 10L * 1024 * 1024;
@@ -13,8 +16,13 @@ public static class PresetService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <summary>Gets the directory used to store preset files.</summary>
     public static string GetPresetDirectory()
     {
+        var configuredDirectory = Environment.GetEnvironmentVariable("ODMEDIA_PRESET_DIR");
+        if (!string.IsNullOrWhiteSpace(configuredDirectory))
+            return Path.GetFullPath(configuredDirectory);
+
         // For single-file publish, AppContext.BaseDirectory is the extraction temp dir, not the exe dir.
         // Use Environment.ProcessPath (odmedia.exe) when available, fallback to AppContext.BaseDirectory.
         var exePath = Environment.ProcessPath;
@@ -33,6 +41,7 @@ public static class PresetService
         return Path.Combine(AppContext.BaseDirectory, "presets");
     }
 
+    /// <summary>Ensures that the preset directory can be created and written to.</summary>
     public static void EnsureWritable()
     {
         var dir = GetPresetDirectory();
@@ -40,41 +49,44 @@ public static class PresetService
         {
             Directory.CreateDirectory(dir);
             // probe write
-            var probe = Path.Combine(dir, ".write_test");
+            var probe = Path.Combine(dir, $".write-test-{Guid.NewGuid():N}.tmp");
             File.WriteAllText(probe, "test");
             File.Delete(probe);
         }
         catch (UnauthorizedAccessException ex)
         {
             throw new InvalidOperationException(
-                $"Impossible d'écrire dans \"{dir}\" — dossier non inscriptible. Déplacez odmedia.exe dans un dossier inscriptible ou lancez en administrateur.", ex);
+                $"Cannot write to \"{dir}\". Move odmedia.exe to a writable folder or run it as an administrator.", ex);
         }
         catch (IOException ex)
         {
             throw new InvalidOperationException(
-                $"Impossible d'écrire dans \"{dir}\" — {ex.Message}", ex);
+                $"Cannot write to \"{dir}\": {ex.Message}", ex);
         }
     }
 
+    /// <summary>Converts a user-supplied preset name into a safe file name.</summary>
     public static string SanitizeName(string name)
     {
         name = name.Trim();
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Le nom du preset ne peut pas être vide.");
+            throw new ArgumentException("Preset name cannot be empty.");
         var invalid = Path.GetInvalidFileNameChars();
         var sanitized = string.Concat(name.Select(c => invalid.Contains(c) ? '_' : c)).Trim();
         if (sanitized.Length > 64) sanitized = sanitized[..64].TrimEnd();
         if (string.IsNullOrWhiteSpace(sanitized))
-            throw new ArgumentException("Nom du preset invalide après sanitization.");
+            throw new ArgumentException("Preset name is invalid after sanitization.");
         return sanitized;
     }
 
+    /// <summary>Gets the full path of a named preset.</summary>
     public static string GetPresetPath(string name)
     {
         var safe = SanitizeName(name);
         return Path.Combine(GetPresetDirectory(), safe + ".json");
     }
 
+    /// <summary>Lists the available preset names in alphabetical order.</summary>
     public static IReadOnlyList<string> List()
     {
         var dir = GetPresetDirectory();
@@ -87,21 +99,24 @@ public static class PresetService
             .ToList();
     }
 
+    /// <summary>Determines whether a named preset exists.</summary>
     public static bool Exists(string name) => File.Exists(GetPresetPath(name));
 
+    /// <summary>Loads and deserializes a named preset.</summary>
     public static PresetFile Load(string name)
     {
         var path = GetPresetPath(name);
         if (!File.Exists(path))
-            throw new FileNotFoundException($"Preset introuvable: \"{name}\" ({path})");
+            throw new FileNotFoundException($"Preset not found: \"{name}\" ({path})");
         var json = File.ReadAllText(path);
         var preset = JsonSerializer.Deserialize<PresetFile>(json, JsonOpts)
-            ?? throw new InvalidOperationException($"Preset corrompu: \"{name}\"");
+            ?? throw new InvalidOperationException($"Preset is corrupted: \"{name}\"");
         if (preset.Tags is null) preset.Tags = new PresetTags();
         return preset;
     }
 
-    public static void Save(PresetFile preset)
+    /// <summary>Saves a preset using a temporary file to avoid partial writes.</summary>
+    public static void Save(PresetFile preset, bool overwrite = false)
     {
         EnsureWritable();
         if (string.IsNullOrWhiteSpace(preset.Name))
@@ -110,27 +125,42 @@ public static class PresetService
         preset.Created = preset.Created == default ? DateTime.UtcNow : preset.Created;
         preset.Version = 1;
         var path = GetPresetPath(preset.Name);
+        if (File.Exists(path) && !overwrite)
+            throw new IOException($"Preset \"{preset.Name}\" already exists. Use --force to overwrite it.");
+
         var json = JsonSerializer.Serialize(preset, JsonOpts);
-        File.WriteAllText(path, json);
+        var temporaryPath = Path.Combine(GetPresetDirectory(), $".{preset.Name}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllText(temporaryPath, json);
+            File.Move(temporaryPath, path, overwrite);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 
+    /// <summary>Deletes a named preset.</summary>
     public static void Delete(string name)
     {
         var path = GetPresetPath(name);
         if (!File.Exists(path))
-            throw new FileNotFoundException($"Preset introuvable: \"{name}\"");
+            throw new FileNotFoundException($"Preset not found: \"{name}\"");
         File.Delete(path);
     }
 
+    /// <summary>Creates an in-memory preset cover from an image file.</summary>
     public static PresetCover? CoverFromFile(string coverPath, string? description = null)
     {
         var fi = new FileInfo(coverPath);
-        if (!fi.Exists) throw new FileNotFoundException($"Cover introuvable: \"{coverPath}\"");
+        if (!fi.Exists) throw new FileNotFoundException($"Cover file not found: \"{coverPath}\"");
         if (fi.Length > MaxCoverBytes)
-            throw new InvalidOperationException($"Cover trop volumineuse ({fi.Length / (1024.0 * 1024):F1} MB > 10 MB). Maximum 10 MB.");
+            throw new InvalidOperationException($"Cover is too large ({fi.Length / (1024.0 * 1024):F1} MB > 10 MB). Maximum is 10 MB.");
         var ext = fi.Extension.ToLowerInvariant();
         if (ext is not ".jpg" and not ".jpeg" and not ".png" and not ".webp" and not ".bmp")
-            throw new InvalidOperationException($"Format cover non supporté \"{ext}\" — utilisez jpg ou png.");
+            throw new InvalidOperationException($"Unsupported cover format \"{ext}\". Use JPG, PNG, WebP, or BMP.");
         var data = File.ReadAllBytes(coverPath);
         var mime = ext switch
         {
@@ -147,6 +177,7 @@ public static class PresetService
         };
     }
 
+    /// <summary>Creates an in-memory preset cover from the first embedded picture.</summary>
     public static PresetCover? CoverFromMediaInfo(MediaInfo info)
     {
         if (info.Pictures.Count == 0) return null;
@@ -156,7 +187,7 @@ public static class PresetService
         if (pic is null || pic.Data.Data is null) return null;
         var len = pic.Data.Data.Length;
         if (len > MaxCoverBytes)
-            throw new InvalidOperationException($"Cover du fichier source trop volumineuse ({len / (1024.0 * 1024):F1} MB > 10 MB).");
+            throw new InvalidOperationException($"The source file cover is too large ({len / (1024.0 * 1024):F1} MB > 10 MB).");
         return new PresetCover
         {
             MimeType = pic.MimeType ?? "image/jpeg",
@@ -165,15 +196,20 @@ public static class PresetService
         };
     }
 
+    /// <summary>Converts a preset into an edit request for a target media file.</summary>
     public static EditOptions ToEditOptions(PresetFile preset, string targetFile, bool noBackup = false, bool keepMtime = false, bool dryRun = false)
     {
         // Build EditOptions with cover handling: preset cover -> temp file
         string? tempCoverPath = null;
         if (preset.Cover is not null)
         {
+            var encodedLength = preset.Cover.DataBase64.Length;
+            if (encodedLength > ((MaxCoverBytes + 2) / 3) * 4)
+                throw new InvalidOperationException("The preset cover is too large.");
+
             var bytes = Convert.FromBase64String(preset.Cover.DataBase64);
             if (bytes.Length > MaxCoverBytes)
-                throw new InvalidOperationException($"Cover du preset trop volumineuse ({bytes.Length / (1024.0 * 1024):F1} MB > 10 MB).");
+                throw new InvalidOperationException($"The preset cover is too large ({bytes.Length / (1024.0 * 1024):F1} MB > 10 MB).");
             // write temp file for MediaTagService.Save which expects a path
             var ext = preset.Cover.MimeType.Contains("png", StringComparison.OrdinalIgnoreCase) ? ".png" : ".jpg";
             tempCoverPath = Path.Combine(Path.GetTempPath(), $"odmedia_preset_{Guid.NewGuid():N}{ext}");
@@ -200,7 +236,7 @@ public static class PresetService
         };
     }
 
-    /// <summary>Cleanup temp cover file created by ToEditOptions after Save.</summary>
+    /// <summary>Deletes a temporary cover file created by <see cref="ToEditOptions"/>.</summary>
     public static void CleanupTempCover(EditOptions opts)
     {
         if (opts.CoverPath is not null && opts.CoverPath.Contains("odmedia_preset_"))
@@ -209,6 +245,7 @@ public static class PresetService
         }
     }
 
+    /// <summary>Gets the decoded byte length of a preset cover, or zero when invalid.</summary>
     public static long GetCoverByteLength(PresetCover cover)
     {
         try { return Convert.FromBase64String(cover.DataBase64).Length; } catch { return 0; }

@@ -3,8 +3,10 @@ using Spectre.Console;
 
 namespace OD.EditMediaInfo.Services;
 
+/// <summary>Renders media information in terminal tables.</summary>
 public static class MediaProbeService
 {
+    /// <summary>Renders technical details, tags, and cover summaries.</summary>
     public static void Render(MediaInfo info)
     {
         // Technical table

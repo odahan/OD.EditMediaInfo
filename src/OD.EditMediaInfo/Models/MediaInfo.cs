@@ -1,5 +1,6 @@
 namespace OD.EditMediaInfo.Models;
 
+/// <summary>Represents technical details, tags, and pictures read from a media file.</summary>
 public sealed record MediaInfo(
     string FilePath,
     string Format,
@@ -27,6 +28,7 @@ public sealed record MediaInfo(
     IReadOnlyList<PictureInfo> Pictures,
     string? Error = null);
 
+/// <summary>Describes an embedded media picture without exposing its binary data.</summary>
 public sealed record PictureInfo(
     string MimeType,
     int Width,

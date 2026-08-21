@@ -1,5 +1,6 @@
 namespace OD.EditMediaInfo.Models;
 
+/// <summary>Represents requested changes to a media file's tags and cover.</summary>
 public sealed class EditOptions
 {
     public string FilePath { get; init; } = string.Empty;

@@ -3,8 +3,10 @@ using Spectre.Console;
 
 namespace OD.EditMediaInfo.Commands;
 
+/// <summary>Implements the command that removes all media tags.</summary>
 public static class ClearCommand
 {
+    /// <summary>Parses and executes the clear command.</summary>
     public static Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         string? input = null;
@@ -62,6 +64,7 @@ public static class ClearCommand
         }
     }
 
+    /// <summary>Writes the clear command help text.</summary>
     public static void PrintHelp()
     {
         AnsiConsole.WriteLine("Usage: odmedia clear <file> [--yes] [--no-backup] [--keep-mtime]");

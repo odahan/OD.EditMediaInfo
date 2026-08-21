@@ -5,8 +5,10 @@ using Spectre.Console;
 
 namespace OD.EditMediaInfo.Commands;
 
+/// <summary>Implements commands used to create and apply tag presets.</summary>
 public static class PresetCommand
 {
+    /// <summary>Parses and executes a preset subcommand.</summary>
     public static Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         if (args.Length == 0)
@@ -59,6 +61,7 @@ public static class PresetCommand
         string? publisher = null;
         string? coverPath = null;
         string? coverDesc = null;
+        bool force = false;
 
         var positional = new List<string>();
         bool hasExplicitTagOption = false;
@@ -80,6 +83,7 @@ public static class PresetCommand
                 case "--publisher": publisher = Next(args, ref i, "--publisher"); hasExplicitTagOption = true; break;
                 case "--cover": coverPath = Next(args, ref i, "--cover"); hasExplicitTagOption = true; break;
                 case "--cover-desc": coverDesc = Next(args, ref i, "--cover-desc"); break;
+                case "--force": force = true; break;
                 case "--help": case "-h": PrintSaveHelp(); return Task.FromResult(0);
                 default:
                     if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
@@ -203,12 +207,12 @@ public static class PresetCommand
                 Cover = cover
             };
 
-            PresetService.Save(preset);
+            PresetService.Save(preset, force);
             AnsiConsole.MarkupLine($"[green]Preset saved:[/] {Markup.Escape(preset.Name)} [grey]({Markup.Escape(PresetService.GetPresetPath(preset.Name))})[/]");
             if (cover is not null)
             {
                 var len = PresetService.GetCoverByteLength(cover);
-                var warn = len > 5 * 1024 * 1024 ? " [yellow]Attention à la taille ![/]" : "";
+                var warn = len > 5 * 1024 * 1024 ? " [yellow]Warning: large cover.[/]" : "";
                 AnsiConsole.MarkupLine($"[grey]Cover: {len / 1024} KB{warn}[/]");
             }
             return Task.FromResult(0);
@@ -327,7 +331,7 @@ public static class PresetCommand
                 var sizeStr = len > 1024 * 1024 ? $"{len / (1024.0 * 1024):F1} MB" : $"{len / 1024} KB";
                 AnsiConsole.MarkupLine($"[green]Cover:[/] {Markup.Escape(p.Cover.MimeType)} {sizeStr} [grey]({Markup.Escape(p.Cover.Description)})[/]");
                 if (len > 5 * 1024 * 1024)
-                    AnsiConsole.MarkupLine("[yellow]Attention à la taille ! Cover > 5 MB[/]");
+                    AnsiConsole.MarkupLine("[yellow]Warning: cover is larger than 5 MB.[/]");
             }
             else
             {
@@ -413,7 +417,7 @@ public static class PresetCommand
                 PresetService.CleanupTempCover(opts);
             }
 
-            AnsiConsole.MarkupLine($"[green]Applied preset[/] {Markup.Escape(preset.Name)} [green]to[/] {Markup.Escape(target)}" + (noBackup ? "" : " [grey](backup .bak created)[/]"));
+            AnsiConsole.MarkupLine($"[green]Applied preset[/] {Markup.Escape(preset.Name)} [green]to[/] {Markup.Escape(target)}" + (noBackup ? "" : " [grey](backup .bak available)[/]"));
             return Task.FromResult(0);
         }
         catch (Exception ex)
@@ -449,7 +453,7 @@ public static class PresetCommand
 
         if (!PresetService.Exists(name))
         {
-            ErrorHandler.Fail($"Preset introuvable: \"{name}\"");
+            ErrorHandler.Fail($"Preset not found: \"{name}\"");
             return Task.FromResult(1);
         }
 
@@ -517,10 +521,11 @@ public static class PresetCommand
         return args[i];
     }
 
+    /// <summary>Writes the preset command help text.</summary>
     public static void PrintHelp()
     {
         AnsiConsole.WriteLine("Usage: odmedia preset <command> [options]");
-        AnsiConsole.WriteLine("  Manage presets (empreintes) stored in <exeDir>/presets/*.json");
+        AnsiConsole.WriteLine("  Manage presets stored in <exeDir>/presets/*.json");
         AnsiConsole.WriteLine("");
         AnsiConsole.WriteLine("Commands:");
         AnsiConsole.WriteLine("  save   <sourceFile> --name <name> [options]   Create preset from file or from scratch");
@@ -529,7 +534,7 @@ public static class PresetCommand
         AnsiConsole.WriteLine("  apply  <file> --name <name> [--dry-run]        Apply preset to file (one at a time)");
         AnsiConsole.WriteLine("  delete <name> [--yes]                           Delete preset");
         AnsiConsole.WriteLine("");
-        AnsiConsole.WriteLine("Aliases: empreinte, empreintes, presets");
+        AnsiConsole.WriteLine("Aliases: presets");
         AnsiConsole.WriteLine("");
         AnsiConsole.WriteLine("See: odmedia preset save --help, odmedia preset apply --help, etc.");
     }
@@ -553,6 +558,7 @@ public static class PresetCommand
         AnsiConsole.WriteLine("  --publisher <text>         Publisher / Label");
         AnsiConsole.WriteLine("  --cover <path>             Cover image (jpg/png/webp/bmp, max 10 MB) — optional, with size warning");
         AnsiConsole.WriteLine("  --cover-desc <text>        Cover description");
+        AnsiConsole.WriteLine("  --force                    Overwrite an existing preset");
         AnsiConsole.WriteLine("");
         AnsiConsole.WriteLine("Examples:");
         AnsiConsole.WriteLine("  odmedia preset save track.mp3 --name \"MonLabel\"");

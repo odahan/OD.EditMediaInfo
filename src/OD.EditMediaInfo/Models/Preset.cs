@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace OD.EditMediaInfo.Models;
 
+/// <summary>Represents the serialized form of a reusable tag preset.</summary>
 public sealed class PresetFile
 {
     [JsonPropertyName("version")]
@@ -25,6 +26,7 @@ public sealed class PresetFile
     public PresetCover? Cover { get; set; }
 }
 
+/// <summary>Contains the generic tag values included in a preset.</summary>
 public sealed class PresetTags
 {
     [JsonPropertyName("artists")]
@@ -70,6 +72,7 @@ public sealed class PresetTags
         Copyright is null && Publisher is null;
 }
 
+/// <summary>Contains base64-encoded cover data included in a preset.</summary>
 public sealed class PresetCover
 {
     [JsonPropertyName("mime")]

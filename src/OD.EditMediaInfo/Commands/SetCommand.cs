@@ -4,8 +4,10 @@ using Spectre.Console;
 
 namespace OD.EditMediaInfo.Commands;
 
+/// <summary>Implements the command that updates media tags.</summary>
 public static class SetCommand
 {
+    /// <summary>Parses and executes the set command.</summary>
     public static Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         string? input = null;
@@ -115,18 +117,18 @@ public static class SetCommand
             return Task.FromResult(1);
         }
 
-        if (dryRun)
-        {
-            AnsiConsole.MarkupLine("[yellow]Dry-run:[/] would apply to: " + Markup.Escape(input));
-            DumpOptions(opts);
-            return Task.FromResult(0);
-        }
-
         try
         {
             var service = new MediaTagService();
+            if (dryRun)
+            {
+                service.Validate(opts);
+                AnsiConsole.MarkupLine("[yellow]Dry-run:[/] would apply to: " + Markup.Escape(input));
+                DumpOptions(opts);
+                return Task.FromResult(0);
+            }
             service.Save(opts);
-            AnsiConsole.MarkupLine($"[green]Saved:[/] {Markup.Escape(input)}" + (noBackup ? "" : " [grey](backup .bak created)[/]"));
+            AnsiConsole.MarkupLine($"[green]Saved:[/] {Markup.Escape(input)}" + (noBackup ? "" : " [grey](backup .bak available)[/]"));
             return Task.FromResult(0);
         }
         catch (Exception ex)
@@ -169,6 +171,7 @@ public static class SetCommand
         return args[i];
     }
 
+    /// <summary>Writes the set command help text.</summary>
     public static void PrintHelp()
     {
         AnsiConsole.WriteLine("Usage: odmedia set <file> [options]");

@@ -2,6 +2,9 @@ using OD.EditMediaInfo.Models;
 
 namespace OD.EditMediaInfo.Services;
 
+/// <summary>
+/// Reads, validates, updates, and clears tags in supported media files.
+/// </summary>
 public sealed class MediaTagService : IMediaTagService
 {
     private const long MaxCoverBytes = 10L * 1024 * 1024;
@@ -13,6 +16,7 @@ public sealed class MediaTagService : IMediaTagService
         TagLib.Id3v2.Tag.ForceDefaultVersion = true;
     }
 
+    /// <summary>Reads technical information and tags from a media file.</summary>
     public MediaInfo Read(string filePath)
     {
         var fileInfo = new FileInfo(filePath);
@@ -57,26 +61,12 @@ public sealed class MediaTagService : IMediaTagService
             Pictures: pictures);
     }
 
+    /// <summary>Applies an edit request and preserves the first backup file by default.</summary>
     public void Save(EditOptions options)
     {
+        Validate(options);
+
         var filePath = options.FilePath;
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException($"File not found: \"{filePath}\"");
-
-        if (options.CoverPath is not null)
-        {
-            var coverInfo = new FileInfo(options.CoverPath);
-            if (!coverInfo.Exists)
-                throw new FileNotFoundException($"Cover file not found: \"{options.CoverPath}\"");
-            if (coverInfo.Length > MaxCoverBytes)
-                throw new InvalidOperationException($"Cover too large ({coverInfo.Length / (1024.0 * 1024):F1} MB > 10 MB). Maximum is 10 MB.");
-            var ext = coverInfo.Extension.ToLowerInvariant();
-            if (ext is not ".jpg" and not ".jpeg" and not ".png" and not ".webp" and not ".bmp")
-                throw new InvalidOperationException($"Unsupported cover format \"{ext}\" — use jpg or png.");
-        }
-
-        if (options.RemoveCover && options.CoverPath is not null)
-            throw new ArgumentException("Cannot use --cover and --remove-cover together.");
 
         if (options.DryRun)
             return;
@@ -85,7 +75,8 @@ public sealed class MediaTagService : IMediaTagService
         if (!options.NoBackup)
         {
             var bak = filePath + ".bak";
-            File.Copy(filePath, bak, overwrite: true);
+            if (!File.Exists(bak))
+                File.Copy(filePath, bak);
         }
 
         DateTime? originalMtime = null;
@@ -130,13 +121,14 @@ public sealed class MediaTagService : IMediaTagService
             File.SetLastWriteTimeUtc(filePath, originalMtime.Value);
     }
 
+    /// <summary>Removes all tags from a media file.</summary>
     public void Clear(string filePath, bool noBackup, bool keepMtime)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: \"{filePath}\"");
 
-        if (!noBackup)
-            File.Copy(filePath, filePath + ".bak", overwrite: true);
+        if (!noBackup && !File.Exists(filePath + ".bak"))
+            File.Copy(filePath, filePath + ".bak");
 
         DateTime? originalMtime = keepMtime ? File.GetLastWriteTimeUtc(filePath) : null;
 
@@ -148,5 +140,38 @@ public sealed class MediaTagService : IMediaTagService
             File.SetLastWriteTimeUtc(filePath, originalMtime.Value);
     }
 
+    /// <summary>
+    /// Validates an edit request without changing the target media file.
+    /// </summary>
+    /// <param name="options">The edit request to validate.</param>
+    /// <exception cref="FileNotFoundException">Thrown when the media file or cover file does not exist.</exception>
+    /// <exception cref="ArgumentException">Thrown when incompatible options are supplied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a cover exceeds the supported size or has an unsupported extension.</exception>
+    public void Validate(EditOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (!File.Exists(options.FilePath))
+            throw new FileNotFoundException($"File not found: \"{options.FilePath}\"");
+
+        if (options.RemoveCover && options.CoverPath is not null)
+            throw new ArgumentException("Cannot use --cover and --remove-cover together.");
+
+        if (options.CoverDescription is not null && options.CoverPath is null)
+            throw new ArgumentException("--cover-desc can only be used together with --cover.");
+
+        if (options.CoverPath is null)
+            return;
+
+        var coverInfo = new FileInfo(options.CoverPath);
+        if (!coverInfo.Exists)
+            throw new FileNotFoundException($"Cover file not found: \"{options.CoverPath}\"");
+        if (coverInfo.Length > MaxCoverBytes)
+            throw new InvalidOperationException($"Cover too large ({coverInfo.Length / (1024.0 * 1024):F1} MB > 10 MB). Maximum is 10 MB.");
+
+        var extension = coverInfo.Extension.ToLowerInvariant();
+        if (extension is not ".jpg" and not ".jpeg" and not ".png" and not ".webp" and not ".bmp")
+            throw new InvalidOperationException($"Unsupported cover format \"{extension}\". Use JPG, PNG, WebP, or BMP.");
+    }
 
 }

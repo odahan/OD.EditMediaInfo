@@ -2,7 +2,25 @@
 using OD.EditMediaInfo.Services;
 using Spectre.Console;
 
-var rawArgs = args;
+try
+{
+    return await RunAsync(args);
+}
+catch (ArgumentException ex)
+{
+    return ErrorHandler.Fail(ex.Message);
+}
+catch (FormatException)
+{
+    return ErrorHandler.Fail("Invalid numeric value.");
+}
+catch (OverflowException)
+{
+    return ErrorHandler.Fail("Numeric value is outside the supported range.");
+}
+
+static async Task<int> RunAsync(string[] rawArgs)
+{
 
 if (rawArgs.Length == 0 || ShouldRunInteractive(rawArgs))
 {
@@ -51,14 +69,12 @@ switch (cmd)
         break;
     case "preset":
     case "presets":
-    case "empreinte":
-    case "empreintes":
         exit = await PresetCommand.RunAsync(rest, cts2.Token);
         break;
     case "--help": case "-h": case "-?": case "help":
         PrintRootHelp(); exit = 0; break;
     case "--version": case "-v": case "version":
-        Console.WriteLine("odmedia 1.2.0 (.NET 10 win-x64, TagLibSharp 2.3.0)");
+        Console.WriteLine("odmedia 1.3.0 (.NET 10 win-x64, TagLibSharp 2.3.0)");
         exit = 0; break;
     default:
         AnsiConsole.MarkupLine($"[red]Error:[/] Unknown command: \"{Markup.Escape(cmd)}\"");
@@ -66,7 +82,8 @@ switch (cmd)
         exit = 1;
         break;
 }
-return exit;
+    return exit;
+}
 
 static bool ShouldRunInteractive(string[] a)
 {
@@ -82,7 +99,7 @@ static bool ShouldRunInteractive(string[] a)
 }
 
 static bool IsSubcommand(string s) =>
-    s is "info" or "probe" or "show" or "set" or "edit" or "tag" or "clear" or "remove" or "preset" or "presets" or "empreinte" or "empreintes" or "help" or "--help" or "-h" or "--version" or "-?";
+    s is "info" or "probe" or "show" or "set" or "edit" or "tag" or "clear" or "remove" or "preset" or "presets" or "help" or "--help" or "-h" or "--version" or "-?";
 
 static void PrintRootHelp()
 {

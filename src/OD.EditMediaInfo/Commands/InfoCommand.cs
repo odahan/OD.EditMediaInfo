@@ -4,8 +4,10 @@ using Spectre.Console;
 
 namespace OD.EditMediaInfo.Commands;
 
+/// <summary>Implements the command that displays media information.</summary>
 public static class InfoCommand
 {
+    /// <summary>Parses and executes the info command.</summary>
     public static Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         string? input = null;
@@ -89,6 +91,7 @@ public static class InfoCommand
         }
     }
 
+    /// <summary>Writes the info command help text.</summary>
     public static void PrintHelp()
     {
         AnsiConsole.WriteLine("Usage: odmedia info <file> [--json]");
