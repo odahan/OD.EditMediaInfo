@@ -49,10 +49,16 @@ switch (cmd)
     case "remove":
         exit = await ClearCommand.RunAsync(rest, cts2.Token);
         break;
+    case "preset":
+    case "presets":
+    case "empreinte":
+    case "empreintes":
+        exit = await PresetCommand.RunAsync(rest, cts2.Token);
+        break;
     case "--help": case "-h": case "-?": case "help":
         PrintRootHelp(); exit = 0; break;
     case "--version": case "-v": case "version":
-        Console.WriteLine("odmedia 1.0.0 (.NET 10 win-x64, TagLibSharp 2.3.0)");
+        Console.WriteLine("odmedia 1.2.0 (.NET 10 win-x64, TagLibSharp 2.3.0)");
         exit = 0; break;
     default:
         AnsiConsole.MarkupLine($"[red]Error:[/] Unknown command: \"{Markup.Escape(cmd)}\"");
@@ -76,7 +82,7 @@ static bool ShouldRunInteractive(string[] a)
 }
 
 static bool IsSubcommand(string s) =>
-    s is "info" or "probe" or "show" or "set" or "edit" or "tag" or "clear" or "remove" or "help" or "--help" or "-h" or "--version" or "-?";
+    s is "info" or "probe" or "show" or "set" or "edit" or "tag" or "clear" or "remove" or "preset" or "presets" or "empreinte" or "empreintes" or "help" or "--help" or "-h" or "--version" or "-?";
 
 static void PrintRootHelp()
 {
@@ -87,6 +93,7 @@ static void PrintRootHelp()
     AnsiConsole.WriteLine("  odmedia info <file> [--json]   Show technical & tags");
     AnsiConsole.WriteLine("  odmedia set <file> [options]   Edit tags");
     AnsiConsole.WriteLine("  odmedia clear <file> [--yes]   Remove all tags");
+    AnsiConsole.WriteLine("  odmedia preset <cmd> [options] Manage presets in <exeDir>/presets/");
     AnsiConsole.WriteLine("");
     AnsiConsole.WriteLine("Examples:");
     AnsiConsole.WriteLine("  odmedia song.mp3");
@@ -95,6 +102,8 @@ static void PrintRootHelp()
     AnsiConsole.WriteLine("  odmedia set track.mp3 --cover cover.jpg");
     AnsiConsole.WriteLine("  odmedia set track.mp3 --remove-cover");
     AnsiConsole.WriteLine("  odmedia clear track.mp3 --yes");
+    AnsiConsole.WriteLine("  odmedia preset save track.mp3 --name \"MonLabel\"");
+    AnsiConsole.WriteLine("  odmedia preset apply other.mp3 --name \"MonLabel\"");
     AnsiConsole.WriteLine("");
-    AnsiConsole.WriteLine("See: odmedia info --help, odmedia set --help, odmedia clear --help");
+    AnsiConsole.WriteLine("See: odmedia info --help, odmedia set --help, odmedia clear --help, odmedia preset --help");
 }

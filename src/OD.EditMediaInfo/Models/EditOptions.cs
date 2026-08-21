@@ -15,6 +15,8 @@ public sealed class EditOptions
     public uint? DiscCount { get; init; }
     public string? Comment { get; init; }
     public string[]? Composers { get; init; }
+    public string? Copyright { get; init; }
+    public string? Publisher { get; init; }
     public string? CoverPath { get; init; }
     public bool RemoveCover { get; init; }
     public string? CoverDescription { get; init; }
@@ -26,5 +28,6 @@ public sealed class EditOptions
         Title is not null || Artists is not null || Album is not null || AlbumArtists is not null ||
         Genres is not null || Year.HasValue || Track.HasValue || TrackCount.HasValue ||
         Disc.HasValue || DiscCount.HasValue || Comment is not null || Composers is not null ||
+        Copyright is not null || Publisher is not null ||
         CoverPath is not null || RemoveCover;
 }

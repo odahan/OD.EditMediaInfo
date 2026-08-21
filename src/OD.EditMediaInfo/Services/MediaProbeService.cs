@@ -37,6 +37,8 @@ public static class MediaProbeService
         tags.AddRow("Disc", info.Disc == 0 ? "-" : $"{info.Disc}" + (info.DiscCount > 0 ? $"/{info.DiscCount}" : ""));
         tags.AddRow("Composer", Markup.Escape(info.Composers.Length == 0 ? "-" : string.Join("; ", info.Composers)));
         tags.AddRow("Comment", Markup.Escape(string.IsNullOrWhiteSpace(info.Comment) ? "-" : info.Comment));
+        tags.AddRow("Copyright", Markup.Escape(string.IsNullOrWhiteSpace(info.Copyright) ? "-" : info.Copyright));
+        tags.AddRow("Publisher", Markup.Escape(string.IsNullOrWhiteSpace(info.Publisher) ? "-" : info.Publisher));
         AnsiConsole.Write(tags);
 
         // Cover summary

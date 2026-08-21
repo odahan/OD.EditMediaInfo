@@ -52,6 +52,8 @@ public sealed class MediaTagService : IMediaTagService
             DiscCount: tag.DiscCount,
             Comment: tag.Comment ?? string.Empty,
             Composers: tag.Composers ?? Array.Empty<string>(),
+            Copyright: tag.Copyright ?? string.Empty,
+            Publisher: tag.Publisher ?? string.Empty,
             Pictures: pictures);
     }
 
@@ -104,6 +106,8 @@ public sealed class MediaTagService : IMediaTagService
         if (options.DiscCount.HasValue) tagFile.Tag.DiscCount = options.DiscCount.Value;
         if (options.Comment is not null) tagFile.Tag.Comment = options.Comment;
         if (options.Composers is not null) tagFile.Tag.Composers = options.Composers;
+        if (options.Copyright is not null) tagFile.Tag.Copyright = options.Copyright;
+        if (options.Publisher is not null) tagFile.Tag.Publisher = options.Publisher;
 
         if (options.RemoveCover)
         {

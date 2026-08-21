@@ -22,6 +22,8 @@ public sealed record MediaInfo(
     uint DiscCount,
     string Comment,
     string[] Composers,
+    string Copyright,
+    string Publisher,
     IReadOnlyList<PictureInfo> Pictures,
     string? Error = null);
 

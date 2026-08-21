@@ -21,6 +21,8 @@ public static class SetCommand
         uint? discCount = null;
         string? comment = null;
         string[]? composers = null;
+        string? copyright = null;
+        string? publisher = null;
         string? cover = null;
         bool removeCover = false;
         string? coverDesc = null;
@@ -47,6 +49,8 @@ public static class SetCommand
                 case "--disc-count": discCount = uint.Parse(Next(args, ref i, "--disc-count")); break;
                 case "--comment": comment = Next(args, ref i, "--comment"); break;
                 case "--composer": composers = Split(Next(args, ref i, "--composer")); break;
+                case "--copyright": copyright = Next(args, ref i, "--copyright"); break;
+                case "--publisher": publisher = Next(args, ref i, "--publisher"); break;
                 case "--cover": cover = Next(args, ref i, "--cover"); break;
                 case "--remove-cover": removeCover = true; break;
                 case "--cover-desc": coverDesc = Next(args, ref i, "--cover-desc"); break;
@@ -95,6 +99,8 @@ public static class SetCommand
             DiscCount = discCount,
             Comment = comment,
             Composers = composers,
+            Copyright = copyright,
+            Publisher = publisher,
             CoverPath = cover,
             RemoveCover = removeCover,
             CoverDescription = coverDesc,
@@ -147,6 +153,8 @@ public static class SetCommand
         if (o.DiscCount.HasValue) table.AddRow("DiscCount", o.DiscCount.Value.ToString());
         if (o.Comment is not null) table.AddRow("Comment", Markup.Escape(o.Comment));
         if (o.Composers is not null) table.AddRow("Composer", Markup.Escape(string.Join("; ", o.Composers)));
+        if (o.Copyright is not null) table.AddRow("Copyright", Markup.Escape(o.Copyright));
+        if (o.Publisher is not null) table.AddRow("Publisher", Markup.Escape(o.Publisher));
         if (o.CoverPath is not null) table.AddRow("Cover", Markup.Escape(o.CoverPath));
         if (o.RemoveCover) table.AddRow("Cover", "[red]remove[/]");
         AnsiConsole.Write(table);
@@ -179,6 +187,8 @@ public static class SetCommand
         AnsiConsole.WriteLine("  --disc-count <n>         Total discs");
         AnsiConsole.WriteLine("  --comment <text>         Comment");
         AnsiConsole.WriteLine("  --composer <c1;c2>       Composer(s)");
+        AnsiConsole.WriteLine("  --copyright <text>       Copyright");
+        AnsiConsole.WriteLine("  --publisher <text>       Publisher / Label");
         AnsiConsole.WriteLine("  --cover <path>           Cover image (jpg/png, max 10 MB)");
         AnsiConsole.WriteLine("  --remove-cover           Remove all covers");
         AnsiConsole.WriteLine("  --cover-desc <text>      Cover description");

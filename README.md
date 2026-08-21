@@ -34,10 +34,19 @@ odmedia info track.mp4 --json
 # Edit tags
 odmedia set track.mp3 --title "New Title" --artist "Artist" --album "Album"
 odmedia set track.mp3 --title "T" --artist "A;B" --genre "Rock;Pop" --year 2024 --track 5 --track-count 12
-odmedia set track.mp3 --comment "My comment" --composer "Composer"
+odmedia set track.mp3 --comment "My comment" --composer "Composer" --copyright "©2024 Label" --publisher "My Label"
 odmedia set track.mp3 --cover cover.jpg
 odmedia set track.mp3 --remove-cover
 odmedia set track.mp3 --title "T" --cover cover.jpg --no-backup --keep-mtime --dry-run
+
+# Presets (empreintes) — stored in <exeDir>/presets/*.json
+odmedia preset save track.mp3 --name "MonLabel"                          # from file, checkbox-filtered in interactive, auto-all in CLI
+odmedia preset save --name "MonLabel" --artist "John" --genre "Rock" --copyright "©2024" --publisher "Label" --cover cover.jpg
+odmedia preset list
+odmedia preset show "MonLabel" --json
+odmedia preset apply other.mp3 --name "MonLabel" --dry-run
+odmedia preset apply other.mp3 --name "MonLabel" --no-backup --keep-mtime
+odmedia preset delete "MonLabel" --yes
 
 # Clear all tags
 odmedia clear track.mp3 --yes
@@ -63,6 +72,8 @@ odmedia --version
 | `--disc-count` | Total discs | - |
 | `--comment` | Comment | - |
 | `--composer` | Composer(s), `;` separated | - |
+| `--copyright` | Copyright | - |
+| `--publisher` | Publisher / Label | - |
 | `--cover` | Cover image file (jpg/png, max 10 MB) | - |
 | `--remove-cover` | Remove all embedded covers | `false` |
 | `--cover-desc` | Cover description | `Front Cover` |
@@ -70,11 +81,18 @@ odmedia --version
 | `--keep-mtime` | Preserve file modification time | `false` |
 | `--dry-run` | Show what would be done without saving | `false` |
 
-Cover is limited to 10 MB. No resize/transcode in V1 — image is embedded as-is. Larger files are rejected.
+Cover is limited to 10 MB. No resize/transcode in V1 — image is embedded as-is. Larger files are rejected. Preset covers are stored inline base64 in JSON (optional, with size warning >5 MB).
 
 ID3v2.3 is forced for MP3 for Windows Media Player compatibility.
 
 Exit codes: `0 OK`, `1 args/file`, `2 tag error`, `130 cancelled Ctrl+C`.
+
+### Presets
+
+* Location: strictly `<exeDir>/presets/*.json` (created on demand). If not writable → clean error.
+* Interactive: file → menu `Preset — Create from this file` (multi-select checkboxes per field) / `Create from scratch` / `Apply to this file` / `Manage (list/delete)`.
+* Generic fields only: `Artist, Album, AlbumArtist, Genre, Year, Composer, Comment, Copyright, Publisher, Cover(optional)` — `Title/Track/Disc` excluded by design. `EncodedBy` not available via TagLibSharp 2.3.0 and therefore not included.
+* Cover optional with `[yellow]Attention à la taille ! max 10 MB[/]` warning; checked field proposes source cover or external file.
 
 ### `info` options
 
@@ -96,9 +114,9 @@ Prerequisites: .NET SDK 10.0.400, Spectre.Console 0.49.1, TagLibSharp 2.3.0
 
 ```
 src/OD.EditMediaInfo/
-  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile)
+  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile, v1.2.0)
   Program.cs (dispatch + interactive detection)
-  Commands/InfoCommand, SetCommand, ClearCommand
-  Services/IMediaTagService, MediaTagService, MediaProbeService, InteractiveEditor, ErrorHandler
-  Models/MediaInfo, EditOptions
+  Commands/InfoCommand, SetCommand, ClearCommand, PresetCommand
+  Services/IMediaTagService, MediaTagService, MediaProbeService, InteractiveEditor, PresetService, ErrorHandler
+  Models/MediaInfo, EditOptions, Preset
 ```

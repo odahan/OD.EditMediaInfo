@@ -69,6 +69,8 @@ public static class InfoCommand
                     discCount = info.DiscCount,
                     comment = info.Comment,
                     composers = info.Composers,
+                    copyright = info.Copyright,
+                    publisher = info.Publisher,
                     pictures = info.Pictures
                 };
                 Console.WriteLine(JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true }));
