@@ -12,6 +12,14 @@ Self-contained Windows x64 executable. No external dependencies. Edit metadata f
 
 > Building from source is only needed for development. See [Build](#build) below.
 
+## License and support
+
+OD.EditMediaInfo is distributed under a [Donationware License](LICENSE.md).
+
+Copyright © 2026 Olivier Dahan. If the project is useful to you, you can support its development at [Buy Me a Coffee](https://buymeacoffee.com/knhsynths).
+
+Source repository: https://github.com/odahan/OD.EditMediaInfo
+
 ## Usage
 
 ### Interactive mode (viewer + editor)
