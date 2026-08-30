@@ -1,126 +1,262 @@
-﻿using OD.EditMediaInfo.Commands;
+﻿using System.CommandLine;
+using OD.EditMediaInfo.Commands;
 using OD.EditMediaInfo.Services;
 using Spectre.Console;
 
-try
-{
-    return await RunAsync(args);
-}
-catch (ArgumentException ex)
-{
-    return ErrorHandler.Fail(ex.Message);
-}
-catch (FormatException)
-{
-    return ErrorHandler.Fail("Invalid numeric value.");
-}
-catch (OverflowException)
-{
-    return ErrorHandler.Fail("Numeric value is outside the supported range.");
-}
+var root = new RootCommand("odmedia — media info viewer & editor");
 
-static async Task<int> RunAsync(string[] rawArgs)
-{
+var fileArg = new Argument<string?>("file") { Arity = ArgumentArity.ZeroOrOne, Description = "Media file to open in interactive mode" };
+root.AddArgument(fileArg);
 
-if (rawArgs.Length == 0 || ShouldRunInteractive(rawArgs))
+// Info command
+var infoCmd = new Command("info", "Show media technical info and tags");
+var infoFileArg = new Argument<string>("file", "Media file");
+var infoJsonOpt = new Option<bool>("--json", "Output JSON instead of tables");
+infoCmd.AddArgument(infoFileArg);
+infoCmd.AddOption(infoJsonOpt);
+infoCmd.SetHandler((context) =>
 {
-    string? initialInput = rawArgs.Length == 1 ? rawArgs[0].Trim().Trim('"') : null;
+    var file = context.ParseResult.GetValueForArgument(infoFileArg);
+    var json = context.ParseResult.GetValueForOption(infoJsonOpt);
+    return InfoCommand.RunAsync(file, json);
+});
 
-    if (initialInput != null && !File.Exists(initialInput) && !initialInput.StartsWith('-'))
+// Set command
+var setCmd = new Command("set", "Edit media tags");
+var setFileArg = new Argument<string>("file", "Media file");
+var titleOpt = new Option<string?>("--title", "Title");
+var artistOpt = new Option<string?>("--artist", "Artist(s), ; separated");
+var albumOpt = new Option<string?>("--album", "Album");
+var albumArtistOpt = new Option<string?>("--album-artist", "Album artist(s)");
+var genreOpt = new Option<string?>("--genre", "Genre(s)");
+var yearOpt = new Option<uint?>("--year", "Year");
+var trackOpt = new Option<uint?>("--track", "Track number");
+var trackCountOpt = new Option<uint?>("--track-count", "Total tracks");
+var discOpt = new Option<uint?>("--disc", "Disc number");
+var discCountOpt = new Option<uint?>("--disc-count", "Total discs");
+var commentOpt = new Option<string?>("--comment", "Comment");
+var composerOpt = new Option<string?>("--composer", "Composer(s)");
+var copyrightOpt = new Option<string?>("--copyright", "Copyright");
+var publisherOpt = new Option<string?>("--publisher", "Publisher / Label");
+var coverOpt = new Option<string?>("--cover", "Cover image path");
+var coverTypeOpt = new Option<string?>("--cover-type", "Cover type: front, back, other");
+var removeCoverOpt = new Option<bool>("--remove-cover", "Remove all covers");
+var coverDescOpt = new Option<string?>("--cover-desc", "Cover description");
+var noBackupOpt = new Option<bool>("--no-backup", "Do not create backup");
+var keepMtimeOpt = new Option<bool>("--keep-mtime", "Preserve file modification time");
+var dryRunOpt = new Option<bool>("--dry-run", "Show what would be done");
+setCmd.AddArgument(setFileArg);
+setCmd.AddOption(titleOpt);
+setCmd.AddOption(artistOpt);
+setCmd.AddOption(albumOpt);
+setCmd.AddOption(albumArtistOpt);
+setCmd.AddOption(genreOpt);
+setCmd.AddOption(yearOpt);
+setCmd.AddOption(trackOpt);
+setCmd.AddOption(trackCountOpt);
+setCmd.AddOption(discOpt);
+setCmd.AddOption(discCountOpt);
+setCmd.AddOption(commentOpt);
+setCmd.AddOption(composerOpt);
+setCmd.AddOption(copyrightOpt);
+setCmd.AddOption(publisherOpt);
+setCmd.AddOption(coverOpt);
+setCmd.AddOption(coverTypeOpt);
+setCmd.AddOption(removeCoverOpt);
+setCmd.AddOption(coverDescOpt);
+setCmd.AddOption(noBackupOpt);
+setCmd.AddOption(keepMtimeOpt);
+setCmd.AddOption(dryRunOpt);
+setCmd.SetHandler((context) =>
+{
+    var file = context.ParseResult.GetValueForArgument(setFileArg);
+    var title = context.ParseResult.GetValueForOption(titleOpt);
+    var artist = context.ParseResult.GetValueForOption(artistOpt);
+    var album = context.ParseResult.GetValueForOption(albumOpt);
+    var albumArtist = context.ParseResult.GetValueForOption(albumArtistOpt);
+    var genre = context.ParseResult.GetValueForOption(genreOpt);
+    var year = context.ParseResult.GetValueForOption(yearOpt);
+    var track = context.ParseResult.GetValueForOption(trackOpt);
+    var trackCount = context.ParseResult.GetValueForOption(trackCountOpt);
+    var disc = context.ParseResult.GetValueForOption(discOpt);
+    var discCount = context.ParseResult.GetValueForOption(discCountOpt);
+    var comment = context.ParseResult.GetValueForOption(commentOpt);
+    var composer = context.ParseResult.GetValueForOption(composerOpt);
+    var copyright = context.ParseResult.GetValueForOption(copyrightOpt);
+    var publisher = context.ParseResult.GetValueForOption(publisherOpt);
+    var cover = context.ParseResult.GetValueForOption(coverOpt);
+    var coverType = context.ParseResult.GetValueForOption(coverTypeOpt);
+    var removeCover = context.ParseResult.GetValueForOption(removeCoverOpt);
+    var coverDesc = context.ParseResult.GetValueForOption(coverDescOpt);
+    var noBackup = context.ParseResult.GetValueForOption(noBackupOpt);
+    var keepMtime = context.ParseResult.GetValueForOption(keepMtimeOpt);
+    var dryRun = context.ParseResult.GetValueForOption(dryRunOpt);
+    return SetCommand.RunAsync(file, title, artist, album, albumArtist, genre, year, track, trackCount, disc, discCount, comment, composer, copyright, publisher, cover, coverType, removeCover, coverDesc, noBackup, keepMtime, dryRun);
+});
+
+// Clear command
+var clearCmd = new Command("clear", "Remove all tags");
+var clearFileArg = new Argument<string>("file", "Media file");
+var yesOpt = new Option<bool>("--yes", "Skip confirmation");
+var noBackupClearOpt = new Option<bool>("--no-backup", "Do not create backup");
+var keepMtimeClearOpt = new Option<bool>("--keep-mtime", "Preserve file modification time");
+clearCmd.AddArgument(clearFileArg);
+clearCmd.AddOption(yesOpt);
+clearCmd.AddOption(noBackupClearOpt);
+clearCmd.AddOption(keepMtimeClearOpt);
+clearCmd.SetHandler((context) =>
+{
+    var file = context.ParseResult.GetValueForArgument(clearFileArg);
+    var yes = context.ParseResult.GetValueForOption(yesOpt);
+    var noBackup = context.ParseResult.GetValueForOption(noBackupClearOpt);
+    var keepMtime = context.ParseResult.GetValueForOption(keepMtimeClearOpt);
+    return ClearCommand.RunAsync(file, yes, noBackup, keepMtime);
+});
+
+// Preset command
+var presetCmd = new Command("preset", "Manage presets");
+
+// save subcommand
+var saveCmd = new Command("save", "Create preset");
+var saveSourceArg = new Argument<string?>("sourceFile") { Arity = ArgumentArity.ZeroOrOne };
+var saveNameOpt = new Option<string>("--name", "Preset name (required)") { IsRequired = true };
+var saveArtistOpt = new Option<string?>("--artist", "Artist(s)");
+var saveAlbumOpt = new Option<string?>("--album", "Album");
+var saveAlbumArtistOpt = new Option<string?>("--album-artist", "Album artist(s)");
+var saveGenreOpt = new Option<string?>("--genre", "Genre(s)");
+var saveYearOpt = new Option<uint?>("--year", "Year");
+var saveCommentOpt = new Option<string?>("--comment", "Comment");
+var saveComposerOpt = new Option<string?>("--composer", "Composer(s)");
+var saveCopyrightOpt = new Option<string?>("--copyright", "Copyright");
+var savePublisherOpt = new Option<string?>("--publisher", "Publisher / Label");
+var saveCoverOpt = new Option<string?>("--cover", "Cover image path");
+var saveCoverTypeOpt = new Option<string?>("--cover-type", "Cover type: front, back, other");
+var saveCoverDescOpt = new Option<string?>("--cover-desc", "Cover description");
+var saveForceOpt = new Option<bool>("--force", "Overwrite existing preset");
+saveCmd.AddArgument(saveSourceArg);
+saveCmd.AddOption(saveNameOpt);
+saveCmd.AddOption(saveArtistOpt);
+saveCmd.AddOption(saveAlbumOpt);
+saveCmd.AddOption(saveAlbumArtistOpt);
+saveCmd.AddOption(saveGenreOpt);
+saveCmd.AddOption(saveYearOpt);
+saveCmd.AddOption(saveCommentOpt);
+saveCmd.AddOption(saveComposerOpt);
+saveCmd.AddOption(saveCopyrightOpt);
+saveCmd.AddOption(savePublisherOpt);
+saveCmd.AddOption(saveCoverOpt);
+saveCmd.AddOption(saveCoverTypeOpt);
+saveCmd.AddOption(saveCoverDescOpt);
+saveCmd.AddOption(saveForceOpt);
+saveCmd.SetHandler((context) =>
+{
+    var sourceFile = context.ParseResult.GetValueForArgument(saveSourceArg);
+    var name = context.ParseResult.GetValueForOption(saveNameOpt);
+    var artist = context.ParseResult.GetValueForOption(saveArtistOpt);
+    var album = context.ParseResult.GetValueForOption(saveAlbumOpt);
+    var albumArtist = context.ParseResult.GetValueForOption(saveAlbumArtistOpt);
+    var genre = context.ParseResult.GetValueForOption(saveGenreOpt);
+    var year = context.ParseResult.GetValueForOption(saveYearOpt);
+    var comment = context.ParseResult.GetValueForOption(saveCommentOpt);
+    var composer = context.ParseResult.GetValueForOption(saveComposerOpt);
+    var copyright = context.ParseResult.GetValueForOption(saveCopyrightOpt);
+    var publisher = context.ParseResult.GetValueForOption(savePublisherOpt);
+    var cover = context.ParseResult.GetValueForOption(saveCoverOpt);
+    var coverType = context.ParseResult.GetValueForOption(saveCoverTypeOpt);
+    var coverDesc = context.ParseResult.GetValueForOption(saveCoverDescOpt);
+    var force = context.ParseResult.GetValueForOption(saveForceOpt);
+    return PresetCommand.SaveAsync(sourceFile, name!, artist, album, albumArtist, genre, year, comment, composer, copyright, publisher, cover, coverType, coverDesc, force);
+});
+
+// list subcommand
+var listCmd = new Command("list", "List presets");
+var listJsonOpt = new Option<bool>("--json", "Output JSON");
+listCmd.AddOption(listJsonOpt);
+listCmd.SetHandler((context) =>
+{
+    var json = context.ParseResult.GetValueForOption(listJsonOpt);
+    return PresetCommand.ListAsync(json);
+});
+
+// show subcommand
+var showCmd = new Command("show", "Show preset details");
+var showNameArg = new Argument<string>("name", "Preset name");
+var showJsonOpt = new Option<bool>("--json", "Output JSON");
+showCmd.AddArgument(showNameArg);
+showCmd.AddOption(showJsonOpt);
+showCmd.SetHandler((context) =>
+{
+    var name = context.ParseResult.GetValueForArgument(showNameArg);
+    var json = context.ParseResult.GetValueForOption(showJsonOpt);
+    return PresetCommand.ShowAsync(name, json);
+});
+
+// apply subcommand
+var applyCmd = new Command("apply", "Apply preset to file");
+var applyFileArg = new Argument<string>("file", "Target file");
+var applyNameOpt = new Option<string>("--name", "Preset name") { IsRequired = true };
+var applyNoBackupOpt = new Option<bool>("--no-backup", "Do not create backup");
+var applyKeepMtimeOpt = new Option<bool>("--keep-mtime", "Preserve file modification time");
+var applyDryRunOpt = new Option<bool>("--dry-run", "Show what would be done");
+applyCmd.AddArgument(applyFileArg);
+applyCmd.AddOption(applyNameOpt);
+applyCmd.AddOption(applyNoBackupOpt);
+applyCmd.AddOption(applyKeepMtimeOpt);
+applyCmd.AddOption(applyDryRunOpt);
+applyCmd.SetHandler((context) =>
+{
+    var file = context.ParseResult.GetValueForArgument(applyFileArg);
+    var name = context.ParseResult.GetValueForOption(applyNameOpt);
+    var noBackup = context.ParseResult.GetValueForOption(applyNoBackupOpt);
+    var keepMtime = context.ParseResult.GetValueForOption(applyKeepMtimeOpt);
+    var dryRun = context.ParseResult.GetValueForOption(applyDryRunOpt);
+    return PresetCommand.ApplyAsync(file, name!, noBackup, keepMtime, dryRun);
+});
+
+// delete subcommand
+var deleteCmd = new Command("delete", "Delete preset");
+var deleteNameArg = new Argument<string>("name", "Preset name");
+var deleteYesOpt = new Option<bool>("--yes", "Skip confirmation");
+deleteCmd.AddArgument(deleteNameArg);
+deleteCmd.AddOption(deleteYesOpt);
+deleteCmd.SetHandler((context) =>
+{
+    var name = context.ParseResult.GetValueForArgument(deleteNameArg);
+    var yes = context.ParseResult.GetValueForOption(deleteYesOpt);
+    return PresetCommand.DeleteAsync(name, yes);
+});
+
+presetCmd.AddCommand(saveCmd);
+presetCmd.AddCommand(listCmd);
+presetCmd.AddCommand(showCmd);
+presetCmd.AddCommand(applyCmd);
+presetCmd.AddCommand(deleteCmd);
+
+root.AddCommand(infoCmd);
+root.AddCommand(setCmd);
+root.AddCommand(clearCmd);
+root.AddCommand(presetCmd);
+
+// Root handler for interactive mode
+root.SetHandler((context) =>
+{
+    var file = context.ParseResult.GetValueForArgument(fileArg);
+    if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
     {
-        AnsiConsole.MarkupLine($"[red]Error:[/] File not found: \"{Markup.Escape(initialInput)}\"");
-        return 1;
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+            return InteractiveEditor.RunAsync(file, cts.Token);
+        }
+        catch (OperationCanceledException) { return Task.FromResult(130); }
+        catch (Exception ex) { return Task.FromResult(ErrorHandler.Fail(ex.Message)); }
     }
-
-    using var cts = new CancellationTokenSource();
-    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-    try
+    else
     {
-        return await InteractiveEditor.RunAsync(initialInput, cts.Token);
+        root.Invoke("--help");
+        return Task.FromResult(0);
     }
-    catch (OperationCanceledException)
-    {
-        return 130;
-    }
-}
+});
 
-var cmd = rawArgs[0].ToLowerInvariant();
-string[] rest = rawArgs.Skip(1).ToArray();
-
-using var cts2 = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts2.Cancel(); };
-
-int exit;
-switch (cmd)
-{
-    case "info":
-    case "probe":
-    case "show":
-        exit = await InfoCommand.RunAsync(rest, cts2.Token);
-        break;
-    case "set":
-    case "edit":
-    case "tag":
-        exit = await SetCommand.RunAsync(rest, cts2.Token);
-        break;
-    case "clear":
-    case "remove":
-        exit = await ClearCommand.RunAsync(rest, cts2.Token);
-        break;
-    case "preset":
-    case "presets":
-        exit = await PresetCommand.RunAsync(rest, cts2.Token);
-        break;
-    case "--help": case "-h": case "-?": case "help":
-        PrintRootHelp(); exit = 0; break;
-    case "--version": case "-v": case "version":
-        Console.WriteLine("odmedia 1.3.0 (.NET 10 win-x64, TagLibSharp 2.3.0)");
-        exit = 0; break;
-    default:
-        AnsiConsole.MarkupLine($"[red]Error:[/] Unknown command: \"{Markup.Escape(cmd)}\"");
-        PrintRootHelp();
-        exit = 1;
-        break;
-}
-    return exit;
-}
-
-static bool ShouldRunInteractive(string[] a)
-{
-    if (a.Length == 0) return true;
-    if (a.Length == 1)
-    {
-        var p = a[0].Trim().Trim('"');
-        if (File.Exists(p)) return true;
-        if (!p.StartsWith('-') && !IsSubcommand(p) && (p.Contains('.') || p.Contains('\\') || p.Contains('/')))
-            return true;
-    }
-    return false;
-}
-
-static bool IsSubcommand(string s) =>
-    s is "info" or "probe" or "show" or "set" or "edit" or "tag" or "clear" or "remove" or "preset" or "presets" or "help" or "--help" or "-h" or "--version" or "-?";
-
-static void PrintRootHelp()
-{
-    AnsiConsole.WriteLine("odmedia — media info viewer & editor");
-    AnsiConsole.WriteLine("");
-    AnsiConsole.WriteLine("Usage:");
-    AnsiConsole.WriteLine("  odmedia <file>                 Open interactive viewer/editor");
-    AnsiConsole.WriteLine("  odmedia info <file> [--json]   Show technical & tags");
-    AnsiConsole.WriteLine("  odmedia set <file> [options]   Edit tags");
-    AnsiConsole.WriteLine("  odmedia clear <file> [--yes]   Remove all tags");
-    AnsiConsole.WriteLine("  odmedia preset <cmd> [options] Manage presets in <exeDir>/presets/");
-    AnsiConsole.WriteLine("");
-    AnsiConsole.WriteLine("Examples:");
-    AnsiConsole.WriteLine("  odmedia song.mp3");
-    AnsiConsole.WriteLine("  odmedia info track.m4a --json");
-    AnsiConsole.WriteLine("  odmedia set track.mp3 --title \"New Title\" --artist \"Artist\" --year 2024");
-    AnsiConsole.WriteLine("  odmedia set track.mp3 --cover cover.jpg");
-    AnsiConsole.WriteLine("  odmedia set track.mp3 --remove-cover");
-    AnsiConsole.WriteLine("  odmedia clear track.mp3 --yes");
-    AnsiConsole.WriteLine("  odmedia preset save track.mp3 --name \"MonLabel\"");
-    AnsiConsole.WriteLine("  odmedia preset apply other.mp3 --name \"MonLabel\"");
-    AnsiConsole.WriteLine("");
-    AnsiConsole.WriteLine("See: odmedia info --help, odmedia set --help, odmedia clear --help, odmedia preset --help");
-}
+return await root.InvokeAsync(args);

@@ -23,42 +23,49 @@ public sealed class MediaTagService : IMediaTagService
         if (!fileInfo.Exists)
             throw new FileNotFoundException($"File not found: \"{filePath}\"");
 
-        using var tagFile = TagLib.File.Create(filePath);
-        var props = tagFile.Properties;
-        var tag = tagFile.Tag;
+        try
+        {
+            using var tagFile = TagLib.File.Create(filePath);
+            var props = tagFile.Properties;
+            var tag = tagFile.Tag;
 
-        var pictures = tag.Pictures.Select(p => new PictureInfo(
-            p.MimeType ?? "unknown",
-            0, 0,
-            p.Type.ToString(),
-            p.Description ?? string.Empty,
-            p.Data?.Data?.Length ?? 0)).ToList();
+            var pictures = tag.Pictures.Select(p => new PictureInfo(
+                p.MimeType ?? "unknown",
+                0, 0,
+                p.Type.ToString(),
+                p.Description ?? string.Empty,
+                p.Data?.Data?.Length ?? 0)).ToList();
 
-        return new MediaInfo(
-            FilePath: filePath,
-            Format: props.Description ?? Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant(),
-            Codec: string.Join(", ", props.Codecs.Where(c => c != null).Select(c => c.Description).Where(d => !string.IsNullOrWhiteSpace(d))) ?? string.Empty,
-            Duration: props.Duration,
-            AudioBitrate: props.AudioBitrate,
-            AudioSampleRate: props.AudioSampleRate,
-            AudioChannels: props.AudioChannels,
-            AudioBitsPerSample: props.BitsPerSample > 0 ? props.BitsPerSample : null,
-            FileSize: fileInfo.Length,
-            Title: tag.Title ?? string.Empty,
-            Artists: tag.Performers ?? Array.Empty<string>(),
-            Album: tag.Album ?? string.Empty,
-            AlbumArtists: tag.AlbumArtists ?? Array.Empty<string>(),
-            Genres: tag.Genres ?? Array.Empty<string>(),
-            Year: tag.Year,
-            Track: tag.Track,
-            TrackCount: tag.TrackCount,
-            Disc: tag.Disc,
-            DiscCount: tag.DiscCount,
-            Comment: tag.Comment ?? string.Empty,
-            Composers: tag.Composers ?? Array.Empty<string>(),
-            Copyright: tag.Copyright ?? string.Empty,
-            Publisher: tag.Publisher ?? string.Empty,
-            Pictures: pictures);
+            return new MediaInfo(
+                FilePath: filePath,
+                Format: props.Description ?? Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant(),
+                Codec: string.Join(", ", props.Codecs.Where(c => c != null).Select(c => c.Description).Where(d => !string.IsNullOrWhiteSpace(d))) ?? string.Empty,
+                Duration: props.Duration,
+                AudioBitrate: props.AudioBitrate,
+                AudioSampleRate: props.AudioSampleRate,
+                AudioChannels: props.AudioChannels,
+                AudioBitsPerSample: props.BitsPerSample > 0 ? props.BitsPerSample : null,
+                FileSize: fileInfo.Length,
+                Title: tag.Title ?? string.Empty,
+                Artists: tag.Performers ?? Array.Empty<string>(),
+                Album: tag.Album ?? string.Empty,
+                AlbumArtists: tag.AlbumArtists ?? Array.Empty<string>(),
+                Genres: tag.Genres ?? Array.Empty<string>(),
+                Year: tag.Year,
+                Track: tag.Track,
+                TrackCount: tag.TrackCount,
+                Disc: tag.Disc,
+                DiscCount: tag.DiscCount,
+                Comment: tag.Comment ?? string.Empty,
+                Composers: tag.Composers ?? Array.Empty<string>(),
+                Copyright: tag.Copyright ?? string.Empty,
+                Publisher: tag.Publisher ?? string.Empty,
+                Pictures: pictures);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to read media file \"{filePath}\": {ex.Message}", ex);
+        }
     }
 
     /// <summary>Applies an edit request and preserves the first backup file by default.</summary>
@@ -100,21 +107,36 @@ public sealed class MediaTagService : IMediaTagService
         if (options.Copyright is not null) tagFile.Tag.Copyright = options.Copyright;
         if (options.Publisher is not null) tagFile.Tag.Publisher = options.Publisher;
 
+        // Handle cover
+        var existing = tagFile.Tag.Pictures?.ToList() ?? new List<TagLib.IPicture>();
+
         if (options.RemoveCover)
         {
-            tagFile.Tag.Pictures = Array.Empty<TagLib.IPicture>();
+            existing.Clear();
         }
         else if (options.CoverPath is not null)
         {
+            // Determine type
+            var picType = options.CoverType switch
+            {
+                CoverType.Back => TagLib.PictureType.BackCover,
+                CoverType.Other => TagLib.PictureType.Other,
+                _ => TagLib.PictureType.FrontCover
+            };
+
+            // Remove existing pictures of the same type
+            existing.RemoveAll(p => p.Type == picType);
+
+            // Add new picture
             var pic = new TagLib.Picture(options.CoverPath)
             {
-                Type = TagLib.PictureType.FrontCover,
+                Type = picType,
                 Description = options.CoverDescription ?? string.Empty
             };
-            // Keep existing non-front covers? For V1 replace all with new one.
-            tagFile.Tag.Pictures = new TagLib.IPicture[] { pic };
+            existing.Add(pic);
         }
 
+        tagFile.Tag.Pictures = existing.ToArray();
         tagFile.Save();
 
         if (originalMtime.HasValue)
@@ -174,4 +196,13 @@ public sealed class MediaTagService : IMediaTagService
             throw new InvalidOperationException($"Unsupported cover format \"{extension}\". Use JPG, PNG, WebP, or BMP.");
     }
 
+    private static TagLib.PictureType ParseCoverType(string? type)
+    {
+        return type?.ToLowerInvariant() switch
+        {
+            "back" => TagLib.PictureType.BackCover,
+            "other" => TagLib.PictureType.Other,
+            _ => TagLib.PictureType.FrontCover
+        };
+    }
 }

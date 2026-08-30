@@ -7,44 +7,26 @@ namespace OD.EditMediaInfo.Commands;
 /// <summary>Implements the command that displays media information.</summary>
 public static class InfoCommand
 {
-    /// <summary>Parses and executes the info command.</summary>
-    public static Task<int> RunAsync(string[] args, CancellationToken ct)
+    /// <summary>Executes the info command with parsed arguments.</summary>
+    public static Task<int> RunAsync(string file, bool json)
     {
-        string? input = null;
-        bool json = false;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--json": json = true; break;
-                case "--help": case "-h": PrintHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    if (input is null) input = a;
-                    else { ErrorHandler.Fail("Too many arguments"); return Task.FromResult(1); }
-                    break;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(input))
+        if (string.IsNullOrWhiteSpace(file))
         {
             ErrorHandler.Fail("Missing file. Usage: odmedia info <file> [--json]");
             return Task.FromResult(1);
         }
 
-        input = input.Trim().Trim('"');
-        if (!File.Exists(input))
+        file = file.Trim();
+        if (!File.Exists(file))
         {
-            ErrorHandler.Fail($"File not found: \"{input}\"");
+            ErrorHandler.Fail($"File not found: \"{file}\"");
             return Task.FromResult(1);
         }
 
         try
         {
             var service = new MediaTagService();
-            var info = service.Read(input);
+            var info = service.Read(file);
 
             if (json)
             {

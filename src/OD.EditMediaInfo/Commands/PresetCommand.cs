@@ -8,96 +8,18 @@ namespace OD.EditMediaInfo.Commands;
 /// <summary>Implements commands used to create and apply tag presets.</summary>
 public static class PresetCommand
 {
-    /// <summary>Parses and executes a preset subcommand.</summary>
-    public static Task<int> RunAsync(string[] args, CancellationToken ct)
+    public static Task<int> SaveAsync(string? sourceFile, string name, string? artist, string? album, string? albumArtist,
+        string? genre, uint? year, string? comment, string? composer, string? copyright, string? publisher,
+        string? cover, string? coverType, string? coverDesc, bool force)
     {
-        if (args.Length == 0)
-        {
-            PrintHelp();
-            return Task.FromResult(0);
-        }
-
-        var sub = args[0].ToLowerInvariant();
-        var rest = args.Skip(1).ToArray();
-
-        return sub switch
-        {
-            "save" => SaveAsync(rest),
-            "create" => SaveAsync(rest),
-            "list" => ListAsync(rest),
-            "ls" => ListAsync(rest),
-            "show" => ShowAsync(rest),
-            "apply" => ApplyAsync(rest),
-            "delete" => DeleteAsync(rest),
-            "remove" => DeleteAsync(rest),
-            "rm" => DeleteAsync(rest),
-            "--help" or "-h" or "help" => Task.FromResult(PrintHelpAndReturn()),
-            _ => Task.FromResult(UnknownSub(sub))
-        };
-    }
-
-    private static int UnknownSub(string sub)
-    {
-        ErrorHandler.Fail($"Unknown preset subcommand: \"{sub}\". See odmedia preset --help");
-        return 1;
-    }
-
-    private static int PrintHelpAndReturn() { PrintHelp(); return 0; }
-
-    // odmedia preset save <sourceFile> --name <name> [--artist ... --cover ...]
-    // odmedia preset save --name <name> --artist ... (from scratch)
-    private static Task<int> SaveAsync(string[] args)
-    {
-        string? sourceFile = null;
-        string? name = null;
-        string[]? artists = null;
-        string? album = null;
-        string[]? albumArtists = null;
-        string[]? genres = null;
-        uint? year = null;
-        string? comment = null;
-        string[]? composers = null;
-        string? copyright = null;
-        string? publisher = null;
-        string? coverPath = null;
-        string? coverDesc = null;
-        bool force = false;
-
-        var positional = new List<string>();
-        bool hasExplicitTagOption = false;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--name": name = Next(args, ref i, "--name"); break;
-                case "--artist": artists = Split(Next(args, ref i, "--artist")); hasExplicitTagOption = true; break;
-                case "--album": album = Next(args, ref i, "--album"); hasExplicitTagOption = true; break;
-                case "--album-artist": albumArtists = Split(Next(args, ref i, "--album-artist")); hasExplicitTagOption = true; break;
-                case "--genre": genres = Split(Next(args, ref i, "--genre")); hasExplicitTagOption = true; break;
-                case "--year": year = uint.Parse(Next(args, ref i, "--year")); hasExplicitTagOption = true; break;
-                case "--comment": comment = Next(args, ref i, "--comment"); hasExplicitTagOption = true; break;
-                case "--composer": composers = Split(Next(args, ref i, "--composer")); hasExplicitTagOption = true; break;
-                case "--copyright": copyright = Next(args, ref i, "--copyright"); hasExplicitTagOption = true; break;
-                case "--publisher": publisher = Next(args, ref i, "--publisher"); hasExplicitTagOption = true; break;
-                case "--cover": coverPath = Next(args, ref i, "--cover"); hasExplicitTagOption = true; break;
-                case "--cover-desc": coverDesc = Next(args, ref i, "--cover-desc"); break;
-                case "--force": force = true; break;
-                case "--help": case "-h": PrintSaveHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    positional.Add(a);
-                    break;
-            }
-        }
-
-        if (positional.Count > 1)
-        {
-            ErrorHandler.Fail("Too many positional arguments — expected at most one source file.");
-            return Task.FromResult(1);
-        }
-        if (positional.Count == 1) sourceFile = positional[0].Trim().Trim('"');
+        // parse arrays
+        string[]? artists = artist is not null ? ArgHelpers.Split(artist) : null;
+        string[]? albumArtists = albumArtist is not null ? ArgHelpers.Split(albumArtist) : null;
+        string[]? genres = genre is not null ? ArgHelpers.Split(genre) : null;
+        string[]? composers = composer is not null ? ArgHelpers.Split(composer) : null;
+        bool hasExplicitTagOption = artist is not null || album is not null || albumArtist is not null ||
+                                     genre is not null || year.HasValue || comment is not null || composer is not null ||
+                                     copyright is not null || publisher is not null || cover is not null;
 
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -105,10 +27,10 @@ public static class PresetCommand
             return Task.FromResult(1);
         }
 
-        // Validate source if provided
         MediaInfo? sourceInfo = null;
-        if (sourceFile is not null)
+        if (!string.IsNullOrWhiteSpace(sourceFile))
         {
+            sourceFile = sourceFile.Trim();
             if (!File.Exists(sourceFile))
             {
                 ErrorHandler.Fail($"Source file not found: \"{sourceFile}\"");
@@ -125,14 +47,10 @@ public static class PresetCommand
             }
         }
 
-        // Build preset
         try
         {
             var tags = new PresetTags();
 
-            // If explicit tags given via CLI, use them (from scratch or override source)
-            // If source provided and no explicit tag options, we default to include all generic fields from source (user wanted checkbox in interactive, but CLI non-interactive should still be useful)
-            // For CLI non-interactive: if source + no explicit options -> copy all generic fields from source
             if (sourceInfo is not null && !hasExplicitTagOption)
             {
                 tags.Artists = sourceInfo.Artists.Length > 0 ? sourceInfo.Artists : null;
@@ -147,14 +65,9 @@ public static class PresetCommand
             }
             else
             {
-                // CLI explicit options (or from scratch)
-                // If source exists and explicit options partially given, we merge: explicit wins, otherwise take from source for missing fields? For now explicit only.
-                // To also support "save source --name X --genre Y" meaning override only genre, we fill missing from source if source exists.
                 if (sourceInfo is not null)
                 {
                     tags.Artists = artists ?? (sourceInfo.Artists.Length > 0 ? sourceInfo.Artists : null);
-                    // For album etc, if not explicitly passed, take from source? Only if user didn't pass --album at all, we keep source value if hasExplicitTagOption but album null -> still take source
-                    // Simpler: if hasExplicitTagOption, take from source for fields not explicitly set? We'll do that.
                     tags.Album = album ?? (string.IsNullOrWhiteSpace(sourceInfo.Album) ? null : sourceInfo.Album);
                     tags.AlbumArtists = albumArtists ?? (sourceInfo.AlbumArtists.Length > 0 ? sourceInfo.AlbumArtists : null);
                     tags.Genres = genres ?? (sourceInfo.Genres.Length > 0 ? sourceInfo.Genres : null);
@@ -163,7 +76,6 @@ public static class PresetCommand
                     tags.Composers = composers ?? (sourceInfo.Composers.Length > 0 ? sourceInfo.Composers : null);
                     tags.Copyright = copyright ?? (string.IsNullOrWhiteSpace(sourceInfo.Copyright) ? null : sourceInfo.Copyright);
                     tags.Publisher = publisher ?? (string.IsNullOrWhiteSpace(sourceInfo.Publisher) ? null : sourceInfo.Publisher);
-                    // If exactly one explicit option was given, still fill rest from source (useful). If truly want only that field, user can create from scratch without source.
                 }
                 else
                 {
@@ -179,20 +91,24 @@ public static class PresetCommand
                 }
             }
 
-            // Cover
-            PresetCover? cover = null;
-            if (coverPath is not null)
+            PresetCover? presetCover = null;
+            if (cover is not null)
             {
-                cover = PresetService.CoverFromFile(coverPath, coverDesc);
+                var coverTypeEnum = coverType?.ToLowerInvariant() switch
+                {
+                    "back" => "Back",
+                    "other" => "Other",
+                    _ => "Front"
+                };
+                presetCover = PresetService.CoverFromFile(cover, coverDesc, coverTypeEnum);
             }
-            else if (sourceInfo is not null && hasExplicitTagOption == false)
+            else if (sourceInfo is not null && !hasExplicitTagOption)
             {
-                // auto-include cover from source when saving all fields CLI without explicit cover option? Keep optional: include if source has cover
-                // For now include automatically when no explicit tags (full copy). If user wants without cover, they can use explicit opts without cover.
-                try { cover = PresetService.CoverFromMediaInfo(sourceInfo); } catch (Exception ex) { ErrorHandler.Fail(ex.Message, 2); return Task.FromResult(2); }
+                try { presetCover = PresetService.CoverFromMediaInfo(sourceInfo); }
+                catch (Exception ex) { ErrorHandler.Fail(ex.Message, 2); return Task.FromResult(2); }
             }
 
-            if (tags.IsEmpty && cover is null)
+            if (tags.IsEmpty && presetCover is null)
             {
                 ErrorHandler.Fail("Preset is empty — no tag provided. Use --artist, --genre, --copyright, etc.");
                 return Task.FromResult(1);
@@ -204,14 +120,14 @@ public static class PresetCommand
                 Created = DateTime.UtcNow,
                 SourceFile = sourceFile,
                 Tags = tags,
-                Cover = cover
+                Cover = presetCover
             };
 
             PresetService.Save(preset, force);
             AnsiConsole.MarkupLine($"[green]Preset saved:[/] {Markup.Escape(preset.Name)} [grey]({Markup.Escape(PresetService.GetPresetPath(preset.Name))})[/]");
-            if (cover is not null)
+            if (presetCover is not null)
             {
-                var len = PresetService.GetCoverByteLength(cover);
+                var len = PresetService.GetCoverByteLength(presetCover);
                 var warn = len > 5 * 1024 * 1024 ? " [yellow]Warning: large cover.[/]" : "";
                 AnsiConsole.MarkupLine($"[grey]Cover: {len / 1024} KB{warn}[/]");
             }
@@ -224,18 +140,8 @@ public static class PresetCommand
         }
     }
 
-    private static Task<int> ListAsync(string[] args)
+    public static Task<int> ListAsync(bool json)
     {
-        bool json = false;
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            if (a is "--json") json = true;
-            else if (a is "--help" or "-h") { PrintListHelp(); return Task.FromResult(0); }
-            else if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-            else { ErrorHandler.Fail($"Unexpected argument: \"{a}\""); return Task.FromResult(1); }
-        }
-
         var names = PresetService.List();
         if (json)
         {
@@ -272,24 +178,8 @@ public static class PresetCommand
         return Task.FromResult(0);
     }
 
-    private static Task<int> ShowAsync(string[] args)
+    public static Task<int> ShowAsync(string name, bool json)
     {
-        string? name = null;
-        bool json = false;
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--json": json = true; break;
-                case "--help": case "-h": PrintShowHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    if (name is null) name = a;
-                    else { ErrorHandler.Fail("Too many arguments"); return Task.FromResult(1); }
-                    break;
-            }
-        }
         if (string.IsNullOrWhiteSpace(name))
         {
             ErrorHandler.Fail("Missing preset name. Usage: odmedia preset show <name>");
@@ -329,7 +219,7 @@ public static class PresetCommand
             {
                 var len = PresetService.GetCoverByteLength(p.Cover);
                 var sizeStr = len > 1024 * 1024 ? $"{len / (1024.0 * 1024):F1} MB" : $"{len / 1024} KB";
-                AnsiConsole.MarkupLine($"[green]Cover:[/] {Markup.Escape(p.Cover.MimeType)} {sizeStr} [grey]({Markup.Escape(p.Cover.Description)})[/]");
+                AnsiConsole.MarkupLine($"[green]Cover:[/] {Markup.Escape(p.Cover.MimeType)} {sizeStr} [grey](type {p.Cover.Type ?? "Front"})[/]");
                 if (len > 5 * 1024 * 1024)
                     AnsiConsole.MarkupLine("[yellow]Warning: cover is larger than 5 MB.[/]");
             }
@@ -347,67 +237,40 @@ public static class PresetCommand
         }
     }
 
-    private static Task<int> ApplyAsync(string[] args)
+    public static Task<int> ApplyAsync(string file, string name, bool noBackup, bool keepMtime, bool dryRun)
     {
-        string? target = null;
-        string? presetName = null;
-        bool noBackup = false;
-        bool keepMtime = false;
-        bool dryRun = false;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--name": presetName = Next(args, ref i, "--name"); break;
-                case "--preset": presetName = Next(args, ref i, "--preset"); break;
-                case "--no-backup": noBackup = true; break;
-                case "--backup": noBackup = false; break;
-                case "--keep-mtime": keepMtime = true; break;
-                case "--dry-run": dryRun = true; break;
-                case "--help": case "-h": PrintApplyHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    if (target is null) target = a;
-                    else { ErrorHandler.Fail("Too many files — apply one file at a time"); return Task.FromResult(1); }
-                    break;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(target))
+        if (string.IsNullOrWhiteSpace(file))
         {
             ErrorHandler.Fail("Missing file. Usage: odmedia preset apply <file> --name <presetName>");
             return Task.FromResult(1);
         }
-        if (string.IsNullOrWhiteSpace(presetName))
+        if (string.IsNullOrWhiteSpace(name))
         {
             ErrorHandler.Fail("Missing --name <presetName>");
             return Task.FromResult(1);
         }
 
-        target = target.Trim().Trim('"');
-        if (!File.Exists(target))
+        file = file.Trim();
+        if (!File.Exists(file))
         {
-            ErrorHandler.Fail($"File not found: \"{target}\"");
+            ErrorHandler.Fail($"File not found: \"{file}\"");
             return Task.FromResult(1);
         }
 
         try
         {
-            var preset = PresetService.Load(presetName);
-            var opts = PresetService.ToEditOptions(preset, target, noBackup, keepMtime, dryRun);
+            var preset = PresetService.Load(name);
+            var opts = PresetService.ToEditOptions(preset, file, noBackup, keepMtime, dryRun);
 
             if (dryRun)
             {
-                AnsiConsole.MarkupLine($"[yellow]Dry-run:[/] would apply preset [cyan]{Markup.Escape(preset.Name)}[/] to {Markup.Escape(target)}");
-                DumpPresetApply(preset, target);
+                AnsiConsole.MarkupLine($"[yellow]Dry-run:[/] would apply preset [cyan]{Markup.Escape(preset.Name)}[/] to {Markup.Escape(file)}");
+                DumpPresetApply(preset, file);
                 PresetService.CleanupTempCover(opts);
                 return Task.FromResult(0);
             }
 
             var service = new MediaTagService();
-            // Save with temp cover file handling
             try
             {
                 service.Save(opts);
@@ -417,7 +280,7 @@ public static class PresetCommand
                 PresetService.CleanupTempCover(opts);
             }
 
-            AnsiConsole.MarkupLine($"[green]Applied preset[/] {Markup.Escape(preset.Name)} [green]to[/] {Markup.Escape(target)}" + (noBackup ? "" : " [grey](backup .bak available)[/]"));
+            AnsiConsole.MarkupLine($"[green]Applied preset[/] {Markup.Escape(preset.Name)} [green]to[/] {Markup.Escape(file)}" + (noBackup ? "" : " [grey](backup .bak available)[/]"));
             return Task.FromResult(0);
         }
         catch (Exception ex)
@@ -427,24 +290,8 @@ public static class PresetCommand
         }
     }
 
-    private static Task<int> DeleteAsync(string[] args)
+    public static Task<int> DeleteAsync(string name, bool yes)
     {
-        string? name = null;
-        bool yes = false;
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--yes": case "-y": yes = true; break;
-                case "--help": case "-h": PrintDeleteHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    if (name is null) name = a;
-                    else { ErrorHandler.Fail("Too many arguments"); return Task.FromResult(1); }
-                    break;
-            }
-        }
         if (string.IsNullOrWhiteSpace(name))
         {
             ErrorHandler.Fail("Missing preset name. Usage: odmedia preset delete <name> [--yes]");
@@ -512,15 +359,6 @@ public static class PresetCommand
         return list.Count == 0 ? "-" : string.Join(", ", list);
     }
 
-    private static string[] Split(string s) => s.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-
-    private static string Next(string[] args, ref int i, string name)
-    {
-        if (i + 1 >= args.Length) throw new ArgumentException($"Missing value for {name}");
-        i++;
-        return args[i];
-    }
-
     /// <summary>Writes the preset command help text.</summary>
     public static void PrintHelp()
     {
@@ -538,62 +376,4 @@ public static class PresetCommand
         AnsiConsole.WriteLine("");
         AnsiConsole.WriteLine("See: odmedia preset save --help, odmedia preset apply --help, etc.");
     }
-
-    private static void PrintSaveHelp()
-    {
-        AnsiConsole.WriteLine("Usage: odmedia preset save [sourceFile] --name <name> [options]");
-        AnsiConsole.WriteLine("  Create a preset. If sourceFile is provided, tags are copied from it (filtered to generic fields).");
-        AnsiConsole.WriteLine("  Fields: only generic tags are stored (Title/Track/Disc excluded by design).");
-        AnsiConsole.WriteLine("");
-        AnsiConsole.WriteLine("Options:");
-        AnsiConsole.WriteLine("  --name <name>              Preset name (required, max 64 chars)");
-        AnsiConsole.WriteLine("  --artist <a;b>             Artist(s)");
-        AnsiConsole.WriteLine("  --album <text>             Album");
-        AnsiConsole.WriteLine("  --album-artist <a;b>       Album artist(s)");
-        AnsiConsole.WriteLine("  --genre <g1;g2>            Genre(s)");
-        AnsiConsole.WriteLine("  --year <n>                 Year");
-        AnsiConsole.WriteLine("  --comment <text>           Comment");
-        AnsiConsole.WriteLine("  --composer <c1;c2>         Composer(s)");
-        AnsiConsole.WriteLine("  --copyright <text>         Copyright");
-        AnsiConsole.WriteLine("  --publisher <text>         Publisher / Label");
-        AnsiConsole.WriteLine("  --cover <path>             Cover image (jpg/png/webp/bmp, max 10 MB) — optional, with size warning");
-        AnsiConsole.WriteLine("  --cover-desc <text>        Cover description");
-        AnsiConsole.WriteLine("  --force                    Overwrite an existing preset");
-        AnsiConsole.WriteLine("");
-        AnsiConsole.WriteLine("Examples:");
-        AnsiConsole.WriteLine("  odmedia preset save track.mp3 --name \"MonLabel\"");
-        AnsiConsole.WriteLine("  odmedia preset save --name \"MonLabel\" --artist \"John\" --genre \"Rock\" --copyright \"©2024\"");
-        AnsiConsole.WriteLine("  odmedia preset save track.mp3 --name \"MonLabel\" --cover cover.jpg");
-    }
-
-    private static void PrintListHelp()
-    {
-        AnsiConsole.WriteLine("Usage: odmedia preset list [--json]");
-        AnsiConsole.WriteLine("  List presets in <exeDir>/presets/");
-    }
-
-    private static void PrintShowHelp()
-    {
-        AnsiConsole.WriteLine("Usage: odmedia preset show <name> [--json]");
-        AnsiConsole.WriteLine("  Show preset details.");
-    }
-
-    private static void PrintApplyHelp()
-    {
-        AnsiConsole.WriteLine("Usage: odmedia preset apply <file> --name <presetName> [options]");
-        AnsiConsole.WriteLine("  Apply preset tags to file (one file at a time). Title/Track/Disc are never modified.");
-        AnsiConsole.WriteLine("");
-        AnsiConsole.WriteLine("Options:");
-        AnsiConsole.WriteLine("  --name <name>      Preset name (required)");
-        AnsiConsole.WriteLine("  --no-backup        Do not create .bak backup");
-        AnsiConsole.WriteLine("  --keep-mtime       Preserve file modification time");
-        AnsiConsole.WriteLine("  --dry-run          Show what would be done");
-    }
-
-    private static void PrintDeleteHelp()
-    {
-        AnsiConsole.WriteLine("Usage: odmedia preset delete <name> [--yes]");
-        AnsiConsole.WriteLine("  Delete preset file.");
-    }
 }
-

@@ -152,7 +152,7 @@ public static class PresetService
     }
 
     /// <summary>Creates an in-memory preset cover from an image file.</summary>
-    public static PresetCover? CoverFromFile(string coverPath, string? description = null)
+    public static PresetCover? CoverFromFile(string coverPath, string? description = null, string? type = "Front")
     {
         var fi = new FileInfo(coverPath);
         if (!fi.Exists) throw new FileNotFoundException($"Cover file not found: \"{coverPath}\"");
@@ -172,6 +172,7 @@ public static class PresetService
         return new PresetCover
         {
             MimeType = mime,
+            Type = type ?? "Front",
             Description = description ?? "Front Cover",
             DataBase64 = Convert.ToBase64String(data)
         };
@@ -181,16 +182,17 @@ public static class PresetService
     public static PresetCover? CoverFromMediaInfo(MediaInfo info)
     {
         if (info.Pictures.Count == 0) return null;
-        // Use TagLib directly to get raw bytes with correct mime
         using var tagFile = TagLib.File.Create(info.FilePath);
         var pic = tagFile.Tag.Pictures.FirstOrDefault();
         if (pic is null || pic.Data.Data is null) return null;
         var len = pic.Data.Data.Length;
         if (len > MaxCoverBytes)
             throw new InvalidOperationException($"The source file cover is too large ({len / (1024.0 * 1024):F1} MB > 10 MB).");
+        var type = pic.Type.ToString(); // "FrontCover", "BackCover", etc.
         return new PresetCover
         {
             MimeType = pic.MimeType ?? "image/jpeg",
+            Type = type,
             Description = pic.Description ?? "Front Cover",
             DataBase64 = Convert.ToBase64String(pic.Data.Data)
         };
@@ -199,8 +201,8 @@ public static class PresetService
     /// <summary>Converts a preset into an edit request for a target media file.</summary>
     public static EditOptions ToEditOptions(PresetFile preset, string targetFile, bool noBackup = false, bool keepMtime = false, bool dryRun = false)
     {
-        // Build EditOptions with cover handling: preset cover -> temp file
         string? tempCoverPath = null;
+        CoverType? coverType = null;
         if (preset.Cover is not null)
         {
             var encodedLength = preset.Cover.DataBase64.Length;
@@ -210,10 +212,22 @@ public static class PresetService
             var bytes = Convert.FromBase64String(preset.Cover.DataBase64);
             if (bytes.Length > MaxCoverBytes)
                 throw new InvalidOperationException($"The preset cover is too large ({bytes.Length / (1024.0 * 1024):F1} MB > 10 MB).");
-            // write temp file for MediaTagService.Save which expects a path
-            var ext = preset.Cover.MimeType.Contains("png", StringComparison.OrdinalIgnoreCase) ? ".png" : ".jpg";
+            var ext = preset.Cover.MimeType?.ToLowerInvariant() switch
+            {
+                "image/png" => ".png",
+                "image/webp" => ".webp",
+                "image/bmp" => ".bmp",
+                _ => ".jpg"
+            };
             tempCoverPath = Path.Combine(Path.GetTempPath(), $"odmedia_preset_{Guid.NewGuid():N}{ext}");
             File.WriteAllBytes(tempCoverPath, bytes);
+
+            coverType = preset.Cover.Type?.ToLowerInvariant() switch
+            {
+                "back" => CoverType.Back,
+                "other" => CoverType.Other,
+                _ => CoverType.Front
+            };
         }
 
         return new EditOptions
@@ -229,6 +243,7 @@ public static class PresetService
             Copyright = preset.Tags.Copyright,
             Publisher = preset.Tags.Publisher,
             CoverPath = tempCoverPath,
+            CoverType = coverType,
             CoverDescription = preset.Cover?.Description,
             NoBackup = noBackup,
             KeepMtime = keepMtime,

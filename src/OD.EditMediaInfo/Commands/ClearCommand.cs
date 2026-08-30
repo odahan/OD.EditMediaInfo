@@ -6,55 +6,33 @@ namespace OD.EditMediaInfo.Commands;
 /// <summary>Implements the command that removes all media tags.</summary>
 public static class ClearCommand
 {
-    /// <summary>Parses and executes the clear command.</summary>
-    public static Task<int> RunAsync(string[] args, CancellationToken ct)
+    /// <summary>Executes the clear command with parsed arguments.</summary>
+    public static Task<int> RunAsync(string file, bool yes, bool noBackup, bool keepMtime)
     {
-        string? input = null;
-        bool yes = false;
-        bool noBackup = false;
-        bool keepMtime = false;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--yes": case "-y": yes = true; break;
-                case "--no-backup": noBackup = true; break;
-                case "--keep-mtime": keepMtime = true; break;
-                case "--help": case "-h": PrintHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    if (input is null) input = a;
-                    else { ErrorHandler.Fail("Too many arguments"); return Task.FromResult(1); }
-                    break;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(input))
+        if (string.IsNullOrWhiteSpace(file))
         {
             ErrorHandler.Fail("Missing file. Usage: odmedia clear <file> [--yes]");
             return Task.FromResult(1);
         }
 
-        input = input.Trim().Trim('"');
-        if (!File.Exists(input))
+        file = file.Trim();
+        if (!File.Exists(file))
         {
-            ErrorHandler.Fail($"File not found: \"{input}\"");
+            ErrorHandler.Fail($"File not found: \"{file}\"");
             return Task.FromResult(1);
         }
 
         if (!yes)
         {
-            if (!AnsiConsole.Confirm($"Remove [red]all tags[/] from \"{Markup.Escape(input)}\"?", false))
+            if (!AnsiConsole.Confirm($"Remove [red]all tags[/] from \"{Markup.Escape(file)}\"?", false))
                 return Task.FromResult(0);
         }
 
         try
         {
             var service = new MediaTagService();
-            service.Clear(input, noBackup, keepMtime);
-            AnsiConsole.MarkupLine($"[green]Cleared:[/] {Markup.Escape(input)}");
+            service.Clear(file, noBackup, keepMtime);
+            AnsiConsole.MarkupLine($"[green]Cleared:[/] {Markup.Escape(file)}");
             return Task.FromResult(0);
         }
         catch (Exception ex)
@@ -70,5 +48,7 @@ public static class ClearCommand
         AnsiConsole.WriteLine("Usage: odmedia clear <file> [--yes] [--no-backup] [--keep-mtime]");
         AnsiConsole.WriteLine("  Remove all tags from file.");
         AnsiConsole.WriteLine("  --yes        Skip confirmation");
+        AnsiConsole.WriteLine("  --no-backup  Do not create backup (.bak)");
+        AnsiConsole.WriteLine("  --keep-mtime Preserve file modification time");
     }
 }

@@ -7,88 +7,39 @@ namespace OD.EditMediaInfo.Commands;
 /// <summary>Implements the command that updates media tags.</summary>
 public static class SetCommand
 {
-    /// <summary>Parses and executes the set command.</summary>
-    public static Task<int> RunAsync(string[] args, CancellationToken ct)
+    /// <summary>Executes the set command with parsed arguments.</summary>
+    public static Task<int> RunAsync(string file, string? title, string? artist, string? album, string? albumArtist, string? genre,
+        uint? year, uint? track, uint? trackCount, uint? disc, uint? discCount, string? comment, string? composer,
+        string? copyright, string? publisher, string? cover, string? coverType, bool removeCover, string? coverDesc,
+        bool noBackup, bool keepMtime, bool dryRun)
     {
-        string? input = null;
-        string? title = null;
-        string[]? artists = null;
-        string? album = null;
-        string[]? albumArtists = null;
-        string[]? genres = null;
-        uint? year = null;
-        uint? track = null;
-        uint? trackCount = null;
-        uint? disc = null;
-        uint? discCount = null;
-        string? comment = null;
-        string[]? composers = null;
-        string? copyright = null;
-        string? publisher = null;
-        string? cover = null;
-        bool removeCover = false;
-        string? coverDesc = null;
-        bool noBackup = false;
-        bool keepMtime = false;
-        bool dryRun = false;
-
-        var positional = new List<string>();
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            var a = args[i];
-            switch (a)
-            {
-                case "--title": title = Next(args, ref i, "--title"); break;
-                case "--artist": artists = Split(Next(args, ref i, "--artist")); break;
-                case "--album": album = Next(args, ref i, "--album"); break;
-                case "--album-artist": albumArtists = Split(Next(args, ref i, "--album-artist")); break;
-                case "--genre": genres = Split(Next(args, ref i, "--genre")); break;
-                case "--year": year = uint.Parse(Next(args, ref i, "--year")); break;
-                case "--track": track = uint.Parse(Next(args, ref i, "--track")); break;
-                case "--track-count": trackCount = uint.Parse(Next(args, ref i, "--track-count")); break;
-                case "--disc": disc = uint.Parse(Next(args, ref i, "--disc")); break;
-                case "--disc-count": discCount = uint.Parse(Next(args, ref i, "--disc-count")); break;
-                case "--comment": comment = Next(args, ref i, "--comment"); break;
-                case "--composer": composers = Split(Next(args, ref i, "--composer")); break;
-                case "--copyright": copyright = Next(args, ref i, "--copyright"); break;
-                case "--publisher": publisher = Next(args, ref i, "--publisher"); break;
-                case "--cover": cover = Next(args, ref i, "--cover"); break;
-                case "--remove-cover": removeCover = true; break;
-                case "--cover-desc": coverDesc = Next(args, ref i, "--cover-desc"); break;
-                case "--no-backup": noBackup = true; break;
-                case "--backup": noBackup = false; break;
-                case "--keep-mtime": keepMtime = true; break;
-                case "--dry-run": dryRun = true; break;
-                case "--help": case "-h": PrintHelp(); return Task.FromResult(0);
-                default:
-                    if (a.StartsWith("-")) { ErrorHandler.Fail($"Unknown option: \"{a}\""); return Task.FromResult(1); }
-                    positional.Add(a);
-                    break;
-            }
-        }
-
-        if (positional.Count == 0)
+        if (string.IsNullOrWhiteSpace(file))
         {
             ErrorHandler.Fail("Missing file. Usage: odmedia set <file> [options]");
             return Task.FromResult(1);
         }
-        if (positional.Count > 1)
+
+        file = file.Trim();
+        if (!File.Exists(file))
         {
-            ErrorHandler.Fail("Too many files — only one file at a time");
+            ErrorHandler.Fail($"File not found: \"{file}\"");
             return Task.FromResult(1);
         }
 
-        input = positional[0].Trim().Trim('"');
-        if (!File.Exists(input))
+        var artists = artist is not null ? ArgHelpers.Split(artist) : null;
+        var albumArtists = albumArtist is not null ? ArgHelpers.Split(albumArtist) : null;
+        var genres = genre is not null ? ArgHelpers.Split(genre) : null;
+        var composers = composer is not null ? ArgHelpers.Split(composer) : null;
+        var coverTypeEnum = coverType?.ToLowerInvariant() switch
         {
-            ErrorHandler.Fail($"File not found: \"{input}\"");
-            return Task.FromResult(1);
-        }
+            "back" => CoverType.Back,
+            "other" => CoverType.Other,
+            _ => CoverType.Front
+        };
 
         var opts = new EditOptions
         {
-            FilePath = input,
+            FilePath = file,
             Title = title,
             Artists = artists,
             Album = album,
@@ -104,6 +55,7 @@ public static class SetCommand
             Copyright = copyright,
             Publisher = publisher,
             CoverPath = cover,
+            CoverType = coverTypeEnum,
             RemoveCover = removeCover,
             CoverDescription = coverDesc,
             NoBackup = noBackup,
@@ -123,12 +75,12 @@ public static class SetCommand
             if (dryRun)
             {
                 service.Validate(opts);
-                AnsiConsole.MarkupLine("[yellow]Dry-run:[/] would apply to: " + Markup.Escape(input));
+                AnsiConsole.MarkupLine("[yellow]Dry-run:[/] would apply to: " + Markup.Escape(file));
                 DumpOptions(opts);
                 return Task.FromResult(0);
             }
             service.Save(opts);
-            AnsiConsole.MarkupLine($"[green]Saved:[/] {Markup.Escape(input)}" + (noBackup ? "" : " [grey](backup .bak available)[/]"));
+            AnsiConsole.MarkupLine($"[green]Saved:[/] {Markup.Escape(file)}" + (noBackup ? "" : " [grey](backup .bak available)[/]"));
             return Task.FromResult(0);
         }
         catch (Exception ex)
@@ -162,15 +114,6 @@ public static class SetCommand
         AnsiConsole.Write(table);
     }
 
-    private static string[] Split(string s) => s.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-
-    private static string Next(string[] args, ref int i, string name)
-    {
-        if (i + 1 >= args.Length) throw new ArgumentException($"Missing value for {name}");
-        i++;
-        return args[i];
-    }
-
     /// <summary>Writes the set command help text.</summary>
     public static void PrintHelp()
     {
@@ -193,6 +136,7 @@ public static class SetCommand
         AnsiConsole.WriteLine("  --copyright <text>       Copyright");
         AnsiConsole.WriteLine("  --publisher <text>       Publisher / Label");
         AnsiConsole.WriteLine("  --cover <path>           Cover image (jpg/png, max 10 MB)");
+        AnsiConsole.WriteLine("  --cover-type <type>      Cover type: front, back, other (default front)");
         AnsiConsole.WriteLine("  --remove-cover           Remove all covers");
         AnsiConsole.WriteLine("  --cover-desc <text>      Cover description");
         AnsiConsole.WriteLine("  --backup / --no-backup   Create .bak backup (default backup)");
@@ -202,6 +146,6 @@ public static class SetCommand
         AnsiConsole.WriteLine("Examples:");
         AnsiConsole.WriteLine("  odmedia set track.mp3 --title \"New Title\" --artist \"Artist\"");
         AnsiConsole.WriteLine("  odmedia set track.mp3 --genre \"Rock;Pop\" --year 2024");
-        AnsiConsole.WriteLine("  odmedia set track.mp3 --cover cover.jpg");
+        AnsiConsole.WriteLine("  odmedia set track.mp3 --cover cover.jpg --cover-type back");
     }
 }

@@ -78,6 +78,10 @@ public sealed class PresetCover
     [JsonPropertyName("mime")]
     public string MimeType { get; set; } = string.Empty;
 
+    [JsonPropertyName("type")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Type { get; set; } // "Front", "Back", "Other"
+
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
 

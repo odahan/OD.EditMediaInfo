@@ -1,5 +1,7 @@
 namespace OD.EditMediaInfo.Models;
 
+public enum CoverType { Front, Back, Other }
+
 /// <summary>Represents requested changes to a media file's tags and cover.</summary>
 public sealed class EditOptions
 {
@@ -19,6 +21,7 @@ public sealed class EditOptions
     public string? Copyright { get; init; }
     public string? Publisher { get; init; }
     public string? CoverPath { get; init; }
+    public CoverType? CoverType { get; init; }
     public bool RemoveCover { get; init; }
     public string? CoverDescription { get; init; }
     public bool NoBackup { get; init; }
