@@ -241,22 +241,14 @@ root.AddCommand(presetCmd);
 root.SetHandler((context) =>
 {
     var file = context.ParseResult.GetValueForArgument(fileArg);
-    if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
+    try
     {
-        try
-        {
-            using var cts = new CancellationTokenSource();
-            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-            return InteractiveEditor.RunAsync(file, cts.Token);
-        }
-        catch (OperationCanceledException) { return Task.FromResult(130); }
-        catch (Exception ex) { return Task.FromResult(ErrorHandler.Fail(ex.Message)); }
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        return InteractiveEditor.RunAsync(file, cts.Token);
     }
-    else
-    {
-        root.Invoke("--help");
-        return Task.FromResult(0);
-    }
+    catch (OperationCanceledException) { return Task.FromResult(130); }
+    catch (Exception ex) { return Task.FromResult(ErrorHandler.Fail(ex.Message)); }
 });
 
 return await root.InvokeAsync(args);

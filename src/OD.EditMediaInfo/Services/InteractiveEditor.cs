@@ -21,25 +21,26 @@ public static class InteractiveEditor
             var version = typeof(InteractiveEditor).Assembly.GetName().Version?.ToString(3) ?? "unknown";
             AnsiConsole.MarkupLine($"[grey]Version {Markup.Escape(version)} | Media info viewer & editor | leave empty to quit[/]");
 
-            if (string.IsNullOrWhiteSpace(currentFile))
-            {
-                currentFile = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Media file [grey](drag & drop or path)[/] :")
-                        .AllowEmpty()
-                        .Validate(p =>
-                        {
-                            if (string.IsNullOrWhiteSpace(p)) return ValidationResult.Success();
-                            var t = p.Trim().Trim('"');
-                            return File.Exists(t) ? ValidationResult.Success() : ValidationResult.Error("File not found");
-                        }));
-                currentFile = currentFile.Trim().Trim('"');
-                if (string.IsNullOrWhiteSpace(currentFile))
-                    return 0;
-            }
-            else
-            {
-                currentFile = currentFile.Trim().Trim('"');
-            }
+    if (string.IsNullOrWhiteSpace(currentFile))
+    {
+        currentFile = AnsiConsole.Prompt(
+            new TextPrompt<string>("Media file [grey](drag & drop or path)[/] :")
+                .AllowEmpty()
+                .Validate(p =>
+                {
+                    if (string.IsNullOrWhiteSpace(p)) return ValidationResult.Success();
+                    var t = p.Trim().Trim('"');
+                    return File.Exists(t) ? ValidationResult.Success() : ValidationResult.Error("File not found");
+                }));
+        currentFile = currentFile.Trim().Trim('"');
+        if (string.IsNullOrWhiteSpace(currentFile))
+            return 0;
+    }
+    else
+    {
+        currentFile = currentFile.Trim().Trim('"');
+        // If the passed file doesn't exist, clear it to force prompt later (but it will be caught below anyway)
+    }
 
             if (!File.Exists(currentFile))
             {
