@@ -26,7 +26,11 @@ public sealed record MediaInfo(
     string Copyright,
     string Publisher,
     IReadOnlyList<PictureInfo> Pictures,
-    string? Error = null);
+    string? Error = null)
+{
+    /// <summary>Gets the detailed, source-labelled inspection results.</summary>
+    public MediaDetails Details { get; init; } = new();
+}
 
 /// <summary>Describes an embedded media picture without exposing its binary data.</summary>
 public sealed record PictureInfo(

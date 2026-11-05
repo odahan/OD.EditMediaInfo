@@ -12,13 +12,15 @@ root.AddArgument(fileArg);
 var infoCmd = new Command("info", "Show media technical info and tags");
 var infoFileArg = new Argument<string>("file", "Media file");
 var infoJsonOpt = new Option<bool>("--json", "Output JSON instead of tables");
+var cadenceOpt = new Option<bool>("--analyze-cadence", "Analyze timing of up to 300 frames from the first video track");
 infoCmd.AddArgument(infoFileArg);
 infoCmd.AddOption(infoJsonOpt);
+infoCmd.AddOption(cadenceOpt);
 infoCmd.SetHandler((context) =>
 {
     var file = context.ParseResult.GetValueForArgument(infoFileArg);
     var json = context.ParseResult.GetValueForOption(infoJsonOpt);
-    return InfoCommand.RunAsync(file, json);
+    return InfoCommand.RunAsync(file, json, context.ParseResult.GetValueForOption(cadenceOpt));
 });
 
 // Set command
@@ -236,6 +238,61 @@ root.AddCommand(infoCmd);
 root.AddCommand(setCmd);
 root.AddCommand(clearCmd);
 root.AddCommand(presetCmd);
+
+var toolsCmd = new Command("tools", "Manage the optional FFmpeg / FFprobe media analyzer");
+var installToolsCmd = new Command("install", "Download and verify FFmpeg / FFprobe beside odmedia.exe");
+installToolsCmd.SetHandler(async context =>
+{
+    try
+    {
+        await MediaToolsService.InstallAnalyzerAsync(new Progress<string>(message => Console.WriteLine(message)));
+        context.ExitCode = 0;
+    }
+    catch (Exception ex) { context.ExitCode = ErrorHandler.Fail(ex.Message, 2); }
+});
+var statusToolsCmd = new Command("status", "Show the detected analyzer location");
+statusToolsCmd.SetHandler(() => Console.WriteLine(FFprobeService.FindExecutable() ?? "Not installed. Run: odmedia tools install"));
+toolsCmd.AddCommand(installToolsCmd);
+toolsCmd.AddCommand(statusToolsCmd);
+root.AddCommand(toolsCmd);
+
+var explorerCmd = new Command("explorer", "Manage the current user's Explorer context menu");
+var explorerInstallCmd = new Command("install", "Add Inspect metadata with odmedia to Explorer");
+explorerInstallCmd.SetHandler(context =>
+{
+    try
+    {
+        MediaToolsService.InstallExplorerMenu();
+        Console.WriteLine("Explorer context menu added for this user. On Windows 11, use Show more options.");
+    }
+    catch (Exception ex) { context.ExitCode = ErrorHandler.Fail(ex.Message, 2); }
+});
+var explorerRemoveCmd = new Command("remove", "Remove the odmedia Explorer context menu");
+explorerRemoveCmd.SetHandler(context =>
+{
+    try { MediaToolsService.RemoveExplorerMenu(); Console.WriteLine("Explorer context menu removed."); }
+    catch (Exception ex) { context.ExitCode = ErrorHandler.Fail(ex.Message, 2); }
+});
+explorerCmd.AddCommand(explorerInstallCmd);
+explorerCmd.AddCommand(explorerRemoveCmd);
+root.AddCommand(explorerCmd);
+
+var manualCmd = new Command("manual", "Extract the offline HTML manuals beside odmedia.exe and open one");
+var manualLanguageOpt = new Option<string?>("--lang", "Manual language: en or fr (default: system UI language, English fallback)");
+var manualNoOpenOpt = new Option<bool>("--no-open", "Extract the manuals without opening the browser");
+manualCmd.AddOption(manualLanguageOpt);
+manualCmd.AddOption(manualNoOpenOpt);
+manualCmd.SetHandler(context =>
+{
+    try
+    {
+        var path = ManualService.Extract(context.ParseResult.GetValueForOption(manualLanguageOpt));
+        Console.WriteLine(path);
+        if (!context.ParseResult.GetValueForOption(manualNoOpenOpt)) ManualService.Open(path);
+    }
+    catch (Exception ex) { context.ExitCode = ErrorHandler.Fail(ex.Message, 2); }
+});
+root.AddCommand(manualCmd);
 
 // Root handler for interactive mode
 root.SetHandler((context) =>

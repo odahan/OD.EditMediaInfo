@@ -27,11 +27,13 @@ public sealed class EditOptions
     public bool NoBackup { get; init; }
     public bool KeepMtime { get; init; }
     public bool DryRun { get; init; }
+    /// <summary>Gets explicit replacements; null values request removal, absent keys preserve a field.</summary>
+    public IReadOnlyDictionary<string, string?> FieldChanges { get; init; } = new Dictionary<string, string?>();
 
     public bool HasAnyTagChange =>
         Title is not null || Artists is not null || Album is not null || AlbumArtists is not null ||
         Genres is not null || Year.HasValue || Track.HasValue || TrackCount.HasValue ||
         Disc.HasValue || DiscCount.HasValue || Comment is not null || Composers is not null ||
         Copyright is not null || Publisher is not null ||
-        CoverPath is not null || RemoveCover;
+        CoverPath is not null || RemoveCover || FieldChanges.Count > 0;
 }

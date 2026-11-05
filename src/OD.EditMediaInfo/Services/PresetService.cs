@@ -224,7 +224,7 @@ public static class PresetService
 
             coverType = preset.Cover.Type?.ToLowerInvariant() switch
             {
-                "back" => CoverType.Back,
+                "back" or "backcover" => CoverType.Back,
                 "other" => CoverType.Other,
                 _ => CoverType.Front
             };

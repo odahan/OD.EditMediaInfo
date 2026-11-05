@@ -8,7 +8,7 @@ namespace OD.EditMediaInfo.Commands;
 public static class InfoCommand
 {
     /// <summary>Executes the info command with parsed arguments.</summary>
-    public static Task<int> RunAsync(string file, bool json)
+    public static Task<int> RunAsync(string file, bool json, bool analyzeCadence = false)
     {
         if (string.IsNullOrWhiteSpace(file))
         {
@@ -27,6 +27,7 @@ public static class InfoCommand
         {
             var service = new MediaTagService();
             var info = service.Read(file);
+            if (analyzeCadence) FFprobeService.AnalyzeCadence(file, info.Details);
 
             if (json)
             {
@@ -55,7 +56,8 @@ public static class InfoCommand
                     composers = info.Composers,
                     copyright = info.Copyright,
                     publisher = info.Publisher,
-                    pictures = info.Pictures
+                    pictures = info.Pictures,
+                    details = info.Details
                 };
                 Console.WriteLine(JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true }));
             }

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>OD.EditMediaInfo — Manuel utilisateur</title>
+<style>
+:root{
+    color-scheme:dark;
+    --bg:#0b1120;
+    --panel:#111c30;
+    --line:#2c3c57;
+    --text:#e9eff9;
+    --muted:#b2c0d7;
+    --accent:#89c8ff;
+    --code:#192840}
+    *{
+        box-sizing:border-box}
+        html{
+            scroll-padding-top:1.5rem}
+            body{
+                margin:0;
+                background:var(--bg);
+                color:var(--text);
+                font:16px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif}
+                a{
+                    color:var(--accent);
+                    text-underline-offset:.2em}
+                    a:hover{
+                        color:#c5e5ff}
+                        a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{
+                            outline:3px solid var(--accent);
+                            outline-offset:5px}
+                            .skip{
+                                position:absolute;
+                                left:1rem;
+                                top:-6rem;
+                                background:var(--panel);
+                                padding:.6rem 1rem;
+                                z-index:3}
+                                .skip:focus{
+                                    top:1rem}
+                                    .layout{
+                                        max-width:1160px;
+                                        margin:auto;
+                                        padding:3rem 2rem;
+                                        display:grid;
+                                        grid-template-columns:210px minmax(0,1fr);
+                                        gap:3rem}
+                                        aside{
+                                            align-self:start;
+                                            position:sticky;
+                                            top:2rem}
+                                            .brand{
+                                                font-size:1.2rem;
+                                                font-weight:750;
+                                                letter-spacing:.02em}
+                                                .edition{
+                                                    font-size:.85rem;
+                                                    color:var(--muted);
+                                                    margin:.2rem 0 1.5rem}
+                                                    nav a{
+                                                        display:block;
+                                                        padding:.35rem 0}
+                                                        nav{
+                                                            border-top:1px solid var(--line);
+                                                            padding-top:1rem}
+                                                            .language{
+                                                                display:inline-block;
+                                                                margin-bottom:1.4rem;
+                                                                border:1px solid var(--line);
+                                                                border-radius:8px;
+                                                                padding:.3rem .8rem}
+                                                                h1{
+                                                                    font-size:clamp(2rem,5vw,3.2rem);
+                                                                    line-height:1.14;
+                                                                    letter-spacing:-.035em;
+                                                                    margin:.3rem 0 1rem}
+                                                                    h2{
+                                                                        font-size:1.45rem;
+                                                                        line-height:1.3;
+                                                                        margin:0 0 1rem}
+                                                                        h3{
+                                                                            font-size:1.05rem;
+                                                                            margin:1.4rem 0 .3rem}
+                                                                            .lead{
+                                                                                font-size:1.12rem;
+                                                                                color:var(--muted);
+                                                                                margin-bottom:1.8rem}
+                                                                                .eyebrow{
+                                                                                    text-transform:uppercase;
+                                                                                    letter-spacing:.12em;
+                                                                                    color:var(--accent);
+                                                                                    font-size:.8rem;
+                                                                                    font-weight:700}
+                                                                                    section{
+                                                                                        margin:2.4rem 0;
+                                                                                        padding-top:1.8rem;
+                                                                                        border-top:1px solid var(--line)}
+                                                                                        p{
+                                                                                            margin:.7rem 0}
+                                                                                            li{
+                                                                                                padding-left:.25rem;
+                                                                                                margin:.35rem 0}
+                                                                                                ol,ul{
+                                                                                                    padding-left:1.4rem}
+                                                                                                    code,kbd,pre{
+                                                                                                        font-family:ui-monospace,Consolas,monospace}
+                                                                                                        code{
+                                                                                                            background:var(--code);
+                                                                                                            padding:.1rem .35rem;
+                                                                                                            border-radius:4px;
+                                                                                                            overflow-wrap:anywhere;
+                                                                                                            font-size:.9em}
+                                                                                                            kbd{
+                                                                                                                font-size:.83em;
+                                                                                                                border:1px solid #526481;
+                                                                                                                border-bottom-width:2px;
+                                                                                                                border-radius:4px;
+                                                                                                                padding:.1rem .35rem;
+                                                                                                                white-space:nowrap;
+                                                                                                                background:var(--code)}
+                                                                                                                pre{
+                                                                                                                    background:var(--panel);
+                                                                                                                    border:1px solid var(--line);
+                                                                                                                    border-radius:10px;
+                                                                                                                    padding:1rem 1.2rem;
+                                                                                                                    overflow:auto;
+                                                                                                                    line-height:1.65;
+                                                                                                                    font-size:.88rem}
+                                                                                                                    pre code{
+                                                                                                                        background:none;
+                                                                                                                        padding:0;
+                                                                                                                        overflow-wrap:normal;
+                                                                                                                        font-size:inherit}
+                                                                                                                        .note{
+                                                                                                                            background:var(--panel);
+                                                                                                                            border-left:3px solid var(--accent);
+                                                                                                                            padding:.8rem 1.1rem;
+                                                                                                                            margin:1.2rem 0;
+                                                                                                                            border-radius:0 8px 8px 0}
+                                                                                                                            .table-wrap{
+                                                                                                                                overflow:auto;
+                                                                                                                                border:1px solid var(--line);
+                                                                                                                                border-radius:10px;
+                                                                                                                                margin:1rem 0}
+                                                                                                                                table{
+                                                                                                                                    border-collapse:collapse;
+                                                                                                                                    width:100%;
+                                                                                                                                    font-size:.94rem}
+                                                                                                                                    th,td{
+                                                                                                                                        padding:.65rem .9rem;
+                                                                                                                                        text-align:left;
+                                                                                                                                        vertical-align:top;
+                                                                                                                                        border-bottom:1px solid var(--line)}
+                                                                                                                                        th{
+                                                                                                                                            background:var(--panel)}
+                                                                                                                                            tr:last-child td{
+                                                                                                                                                border-bottom:0}
+                                                                                                                                                .keep{
+                                                                                                                                                    color:#94e5bd}
+                                                                                                                                                    .replace{
+                                                                                                                                                        color:#ffd680}
+                                                                                                                                                        .remove{
+                                                                                                                                                            color:#ffaaa7}
+                                                                                                                                                            .states{
+                                                                                                                                                                display:grid;
+                                                                                                                                                                grid-template-columns:repeat(3,minmax(0,1fr));
+                                                                                                                                                                gap:.8rem}
+                                                                                                                                                                .state{
+                                                                                                                                                                    background:var(--panel);
+                                                                                                                                                                    border:1px solid var(--line);
+                                                                                                                                                                    border-radius:9px;
+                                                                                                                                                                    padding:.8rem}
+                                                                                                                                                                    .state p{
+                                                                                                                                                                        font-size:.93rem;
+                                                                                                                                                                        margin:.35rem 0 0;
+                                                                                                                                                                        color:var(--muted)}
+                                                                                                                                                                        details{
+                                                                                                                                                                            border:1px solid var(--line);
+                                                                                                                                                                            border-radius:8px;
+                                                                                                                                                                            padding:.7rem 1rem;
+                                                                                                                                                                            margin:.7rem 0}
+                                                                                                                                                                            summary{
+                                                                                                                                                                                cursor:pointer;
+                                                                                                                                                                                font-weight:600}
+                                                                                                                                                                                footer{
+                                                                                                                                                                                    color:var(--muted);
+                                                                                                                                                                                    font-size:.85rem;
+                                                                                                                                                                                    border-top:1px solid var(--line);
+                                                                                                                                                                                    padding-top:1rem;
+                                                                                                                                                                                    margin-top:2.5rem}
+                                                                                                                                                                                    strong{
+                                                                                                                                                                                        font-weight:700}
+                                                                                                                                                                                        @media(max-width:760px){
+                                                                                                                                                                                            .layout{
+                                                                                                                                                                                                display:block;
+                                                                                                                                                                                                padding:1.5rem 1.1rem}
+                                                                                                                                                                                                aside{
+                                                                                                                                                                                                    position:static;
+                                                                                                                                                                                                    margin-bottom:2rem}
+                                                                                                                                                                                                    nav{
+                                                                                                                                                                                                        display:flex;
+                                                                                                                                                                                                        gap:.3rem 1rem;
+                                                                                                                                                                                                        flex-wrap:wrap}
+                                                                                                                                                                                                        nav a{
+                                                                                                                                                                                                            font-size:.9rem}
+                                                                                                                                                                                                            .edition{
+                                                                                                                                                                                                                margin-bottom:1rem}
+                                                                                                                                                                                                                .states{
+                                                                                                                                                                                                                    grid-template-columns:1fr}
+                                                                                                                                                                                                                    th,td{
+                                                                                                                                                                                                                        padding:.55rem .65rem}
+                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                    @media print{
+                                                                                                                                                                                                                        :root{
+                                                                                                                                                                                                                            color-scheme:light;
+                                                                                                                                                                                                                            --bg:#fff;
+                                                                                                                                                                                                                            --panel:#f3f5f8;
+                                                                                                                                                                                                                            --line:#b9c1cc;
+                                                                                                                                                                                                                            --text:#142033;
+                                                                                                                                                                                                                            --muted:#40516a;
+                                                                                                                                                                                                                            --accent:#174d85;
+                                                                                                                                                                                                                            --code:#edf1f6}
+                                                                                                                                                                                                                            body{
+                                                                                                                                                                                                                                font-size:10pt}
+                                                                                                                                                                                                                                .layout{
+                                                                                                                                                                                                                                    display:block;
+                                                                                                                                                                                                                                    padding:0}
+                                                                                                                                                                                                                                    aside,.language,.skip{
+                                                                                                                                                                                                                                        display:none}
+                                                                                                                                                                                                                                        h1{
+                                                                                                                                                                                                                                            font-size:25pt}
+                                                                                                                                                                                                                                            section{
+                                                                                                                                                                                                                                                margin:1.3rem 0;
+                                                                                                                                                                                                                                                padding-top:1rem}
+                                                                                                                                                                                                                                                pre{
+                                                                                                                                                                                                                                                    white-space:pre-wrap;
+                                                                                                                                                                                                                                                    overflow-wrap:anywhere}
+                                                                                                                                                                                                                                                    details{
+                                                                                                                                                                                                                                                        break-inside:avoid}
+                                                                                                                                                                                                                                                        details>*{
+                                                                                                                                                                                                                                                            display:block}
+                                                                                                                                                                                                                                                            a{
+                                                                                                                                                                                                                                                                color:#174d85}
+                                                                                                                                                                                                                                                                .keep,.replace,.remove{
+                                                                                                                                                                                                                                                                    color:#142033}
+                                                                                                                                                                                                                                                                    footer{
+                                                                                                                                                                                                                                                                        font-size:9pt}
+                                                                                                                                                                                                                                                                    }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Aller au manuel</a>
+<div class="layout"><aside><div class="brand">OD.EditMediaInfo</div><p class="edition">Version 2.0.2 · Guide hors ligne</p><a class="language" href="odmedia-manual-en.html" lang="en" hreflang="en" rel="alternate">Read in English →</a><nav aria-label="Sommaire"><a href="#start">Bien démarrer</a><a href="#workspace">Trouver une information</a><a href="#edit">Modifier et enregistrer</a><a href="#keys">Raccourcis clavier</a><a href="#commands">Ligne de commande</a><a href="#setup">Analyseur et Explorateur</a><a href="#help">Aide et limites</a></nav></aside>
+<main id="content"><header><p class="eyebrow">Audio · Vidéo · Photographie</p><h1>Vos médias,<br>en clair.</h1><p class="lead">Consultez les informations techniques et modifiez les métadonnées prises en charge dans une interface de terminal pilotée au clavier.</p></header>
+<section id="start"><h2>1. Ouvrir un fichier</h2><p>Double-cliquez sur <code>odmedia.exe</code>, puis collez ou glissez le chemin d'un fichier dans le terminal et appuyez sur <kbd>Entrée</kbd>. Vous pouvez aussi passer le chemin directement :</p><pre><code>odmedia "C:\Media\ma vidéo.mp4"</code></pre><p>Commencez par <strong>Overview</strong>, la vue d'ensemble. <kbd>Tab</kbd> parcourt les rubriques et <kbd>/</kbd> recherche un champ. <kbd>Entrée</kbd> affiche une valeur complète ou ouvre un champ modifiable. L'aide est accessible avec <kbd>F1</kbd>, y compris pendant la saisie d'un chemin.</p><p>Les libellés de l'application sont en anglais ; ce guide reprend leurs noms pour vous aider à les retrouver.</p></section>
+<section id="workspace"><h2>2. Trouver la bonne information</h2><p>Les rubriques dépendent du fichier et des données disponibles :</p><ul><li><strong>Video / Audio :</strong> codecs, dimensions, cadences, débits, fréquence d'échantillonnage, canaux et détails des pistes.</li><li><strong>Image / Capture / Location :</strong> dimensions, appareil, objectif, focale, temps de pose, ouverture, ISO, dates et GPS.</li><li><strong>Subtitles / Chapters :</strong> sous-titres, langues, pistes par défaut ou forcées et horodatages des chapitres.</li><li><strong>Metadata / Images :</strong> tags descriptifs, auteurs, copyright et pochettes intégrées.</li><li><strong>Color / Advanced :</strong> informations colorimétriques, EXIF/IPTC/XMP et champs d'origine des lecteurs, lorsqu'ils sont disponibles.</li></ul><p>Les tableaux techniques présentent une <strong>valeur et sa source</strong>. Les textes longs sont raccourcis dans la grille ; <kbd>Entrée</kbd> ouvre leur détail défilant. La recherche porte sur les noms, valeurs et sources de toutes les rubriques. Relancez la recherche et videz sa saisie pour retirer le filtre.</p><div class="note">Une valeur absente ne signifie pas zéro. La couverture dépend du fichier, du format et du lecteur. Le nombre d'images indiqué par l'en-tête est identifié comme déclaré ; les débits estimés sont signalés comme tels.</div></section>
+<section id="edit"><h2>3. Plusieurs modifications, un enregistrement</h2><ol><li>Sélectionnez une ligne modifiable et appuyez sur <kbd>Entrée</kbd>. Corrigez sa valeur, puis validez avec <kbd>Entrée</kbd> ; <kbd>Échap</kbd> annule la saisie.</li><li>Continuez dans d'autres lignes ou rubriques. Rien n'est encore enregistré.</li><li>Appuyez sur <kbd>Ctrl</kbd> + <kbd>S</kbd> ou <kbd>F6</kbd> pour revoir toutes les opérations en attente. Les flèches font défiler le récapitulatif ; <kbd>Entrée</kbd> enregistre l'ensemble et <kbd>Échap</kbd> revient à la grille.</li></ol><div class="states"><div class="state"><strong class="keep">Keep · Conserver</strong><p>La valeur actuelle sera conservée.</p></div><div class="state"><strong class="replace">Replace · Remplacer</strong><p>La nouvelle valeur sera écrite.</p></div><div class="state"><strong class="remove">Remove · Supprimer</strong><p>Le champ sera effacé si le format le permet.</p></div></div><p><kbd>Suppr</kbd> prépare une suppression. <kbd>Ctrl</kbd> + <kbd>Z</kbd> rétablit la ligne sélectionnée. Une saisie vide ou composée d'espaces conserve son état en attente ; utilisez l'action explicite de suppression pour effacer un champ.</p><p>Séparez les listes par des points-virgules : <code>Alice; Bob</code>. Utilisez le point décimal : <code>2.8</code>. Le temps de pose accepte <code>1/125</code> seconde. Les dates de l'appareil suivent <code>yyyy-MM-dd HH:mm:ss</code>, sans fuseau horaire supposé. <kbd>Ctrl</kbd> + <kbd>Entrée</kbd> insère un saut de ligne ; <kbd>Ctrl</kbd> + <kbd>A</kbd> vide la saisie.</p><p>Les données de prise de vue et le GPS sont initialement verrouillés. Pour corriger les valeurs prises en charge, choisissez <strong>F4 → Enable capture and GPS editing</strong>. Modifier ces tags ne change ni les pixels ni l'exposition réelle de la photo.</p><h3>Protection à l'enregistrement</h3><p>L'enregistrement utilise une copie temporaire et vérifie par relecture les modifications de la grille avant de remplacer l'original. Le premier fichier <code>.bak</code> est conservé ; il n'est pas actualisé à chaque enregistrement. La création de sauvegarde et la conservation de la date de modification se règlent dans <strong>F4 → Actions</strong>. Un échec conserve les changements en attente.</p><h3>Pochettes et presets</h3><p><strong>F4</strong> permet d'ajouter, remplacer, retirer ou extraire une pochette et de gérer les presets. L'application d'un preset prépare les changements dans la grille. Les pochettes sont limitées à 10 Mo et intégrées sans redimensionnement. L'export JSON et la création d'un preset depuis le fichier utilisent les valeurs enregistrées, sans les changements en attente.</p></section>
+<section id="keys"><h2>Raccourcis clavier</h2><div class="table-wrap" role="region" aria-label="Raccourcis clavier" tabindex="0"><table><thead><tr><th>Touche</th><th>Action</th></tr></thead><tbody><tr><td><kbd>Tab</kbd> / <kbd>Maj</kbd> + <kbd>Tab</kbd></td><td>Rubrique suivante / précédente ; Gauche / Droite fonctionnent aussi.</td></tr><tr><td><kbd>F2</kbd></td><td>Choisir une rubrique.</td></tr><tr><td>Flèches, Page préc. / suiv., Début / Fin</td><td>Parcourir les lignes et les pages.</td></tr><tr><td><kbd>/</kbd> ou <kbd>Ctrl</kbd> + <kbd>F</kbd></td><td>Rechercher dans toutes les rubriques.</td></tr><tr><td><kbd>F3</kbd></td><td>N'afficher que les changements en attente, toutes rubriques confondues.</td></tr><tr><td><kbd>Entrée</kbd></td><td>Modifier un champ ou consulter son détail complet.</td></tr><tr><td><kbd>Suppr</kbd> / <kbd>Ctrl</kbd> + <kbd>Z</kbd></td><td>Préparer une suppression / rétablir la ligne.</td></tr><tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd> ou <kbd>F6</kbd></td><td>Revoir et enregistrer les changements.</td></tr><tr><td><kbd>F4</kbd></td><td>Actions, presets, pochettes et réglages.</td></tr><tr><td><kbd>Ctrl</kbd> + <kbd>O</kbd></td><td>Ouvrir un autre fichier.</td></tr><tr><td><kbd>F1</kbd></td><td>Extraire et ouvrir ce manuel.</td></tr><tr><td><kbd>Échap</kbd></td><td>Quitter ; Save / Discard / Cancel protège les modifications en attente.</td></tr></tbody></table></div></section>
+<section id="commands"><h2>L'essentiel en ligne de commande</h2><p>Exécutez ces commandes depuis le dossier de l'exécutable ou ajoutez ce dossier au PATH. Dans PowerShell, utilisez <code>.\odmedia.exe</code> à la place d'<code>odmedia</code> si l'application n'est pas dans le PATH.</p><pre><code>odmedia info "clip.mp4"
+odmedia info "clip.mp4" --json
+odmedia info "clip.mp4" --analyze-cadence
+odmedia set "musique.mp3" --title "Nouveau titre" --artist "Alice; Bob"
+odmedia set "musique.mp3" --title "Aperçu" --dry-run
+odmedia preset list
+odmedia preset apply "musique.mp3" --name "Mon preset" --dry-run
+odmedia manual --lang fr
+odmedia manual --lang en --no-open
+odmedia --help</code></pre><p><code>--json</code> exporte les résultats techniques et les tags. <code>--dry-run</code> n'enregistre rien. Lorsqu'elles sont proposées, <code>--no-backup</code> désactive la création de sauvegarde et <code>--keep-mtime</code> conserve la date de modification. Le mode interactif exige un terminal ; utilisez <code>info --json</code> pour une sortie redirigée.</p><p><code>odmedia clear "fichier.mp3" --yes</code> retire tous les blocs de tags pris en charge. Réservez cette commande aux cas où vous souhaitez effacer les métadonnées du fichier.</p></section>
+<section id="setup"><h2>Analyseur et intégration à l'Explorateur</h2><h3>Obtenir les détails audio et vidéo étendus</h3><pre><code>odmedia tools status
+odmedia tools install</code></pre><p>Vous pouvez aussi choisir <strong>F4 → Install media analyzer</strong>. Le téléchargement nécessite Internet. FFmpeg et FFprobe sont installés à côté de l'exécutable après vérification SHA-256 ; les outils déjà présents sont conservés. Aucun droit administrateur ni changement du PATH n'est nécessaire. <kbd>Échap</kbd> annule le téléchargement interactif.</p><p>La détection examine d'abord <code>ODMEDIA_FFPROBE</code>, puis le dossier de l'exécutable et enfin le PATH. Sans FFprobe, la lecture photo intégrée et les informations natives disponibles restent accessibles. <strong>F4 → Analyze cadence</strong> examine les horodatages d'au plus 300 images de la première piste vidéo. Une cadence uniforme dans cet échantillon ne certifie pas une cadence constante sur tout le fichier.</p><h3>Ouvrir un fichier depuis l'Explorateur</h3><pre><code>odmedia explorer install
+odmedia explorer remove</code></pre><p>Ces actions sont également disponibles sous <strong>F4</strong>. L'entrée <strong>Inspect metadata with odmedia</strong>, propre au compte utilisateur, ouvre le fichier sélectionné. Sous Windows 11, elle se trouve dans <strong>Afficher plus d'options</strong>. Activez-la depuis l'emplacement définitif de l'exécutable ; recommencez après l'avoir déplacé.</p></section>
+<section id="help"><h2>Aide et limites pratiques</h2><details open><summary>Certains champs ne sont pas modifiables</summary><p>Les dimensions, codecs et cadences sont des propriétés techniques : les changer exige un traitement du média. Les RAW et les formats d'image non pris en charge sont consultables seulement. La lecture RAW dépend de l'appareil et du format. Les modifications JPEG, PNG et TIFF sont disponibles uniquement si le moteur les prend en charge et si elles passent la vérification par relecture.</p></details><details><summary>Le terminal est trop petit</summary><p>Utilisez un terminal d'au moins 76 colonnes sur 18 lignes. Agrandissez la fenêtre ou réduisez la taille de sa police. Entrée affiche les valeurs longues.</p></details><details><summary>L'installation ou l'extraction du manuel est refusée</summary><p>Déplacez odmedia.exe dans un dossier où vous pouvez écrire, puis recommencez. Les outils et les manuels sont placés à côté du véritable exécutable, y compris dans la version autonome.</p></details><details><summary>Comment retrouver l'original ?</summary><p>Fermez le fichier dans l'application et copiez son <code>.bak</code> vers un autre fichier média pour l'examiner. La sauvegarde contient la version antérieure au premier enregistrement avec sauvegarde, pas nécessairement celle qui précède le dernier enregistrement.</p></details><p>Ce manuel est embarqué dans odmedia.exe. <code>odmedia manual</code> choisit le français pour une interface système française, sinon l'anglais. Les deux fichiers HTML sont extraits pour permettre le changement de langue hors ligne. Un nouvel appel à l'aide les actualise depuis la version embarquée ; conservez vos notes personnelles dans un autre fichier.</p></section>
+<footer>OD.EditMediaInfo 2.0.2 · HTML autonome · Thème sombre à l'écran · Sans script ni ressource externe · La commande Imprimer du navigateur utilise une mise en page claire pour le papier.</footer></main></div>
+</body>
+</html>

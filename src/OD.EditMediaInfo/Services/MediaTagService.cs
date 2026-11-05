@@ -17,7 +17,10 @@ public sealed class MediaTagService : IMediaTagService
     }
 
     /// <summary>Reads technical information and tags from a media file.</summary>
-    public MediaInfo Read(string filePath)
+    public MediaInfo Read(string filePath) => MediaInspectionService.Read(filePath);
+
+    /// <summary>Reads the tag library's native properties before extended inspection.</summary>
+    public MediaInfo ReadTags(string filePath)
     {
         var fileInfo = new FileInfo(filePath);
         if (!fileInfo.Exists)
@@ -29,12 +32,16 @@ public sealed class MediaTagService : IMediaTagService
             var props = tagFile.Properties;
             var tag = tagFile.Tag;
 
-            var pictures = tag.Pictures.Select(p => new PictureInfo(
-                p.MimeType ?? "unknown",
-                0, 0,
-                p.Type.ToString(),
-                p.Description ?? string.Empty,
-                p.Data?.Data?.Length ?? 0)).ToList();
+            var pictures = tag.Pictures.Select(p =>
+            {
+                var dimensions = PhotoMetadataService.GetDimensions(p.Data?.Data ?? []);
+                return new PictureInfo(
+                    p.MimeType ?? "unknown",
+                    dimensions.Width, dimensions.Height,
+                    p.Type.ToString(),
+                    p.Description ?? string.Empty,
+                    p.Data?.Data?.Length ?? 0);
+            }).ToList();
 
             return new MediaInfo(
                 FilePath: filePath,
@@ -72,25 +79,26 @@ public sealed class MediaTagService : IMediaTagService
     public void Save(EditOptions options)
     {
         Validate(options);
-
-        var filePath = options.FilePath;
-
-        if (options.DryRun)
-            return;
-
-        // Backup
-        if (!options.NoBackup)
+        if (options.DryRun) return;
+        var original = Path.GetFullPath(options.FilePath);
+        var modified = File.GetLastWriteTimeUtc(original);
+        var temporary = Path.Combine(Path.GetDirectoryName(original)!, $".{Path.GetFileNameWithoutExtension(original)}.{Guid.NewGuid():N}.tmp{Path.GetExtension(original)}");
+        try
         {
-            var bak = filePath + ".bak";
-            if (!File.Exists(bak))
-                File.Copy(filePath, bak);
+            File.Copy(original, temporary);
+            ApplyChanges(options, temporary);
+            VerifyChanges(options, temporary);
+            var backup = !options.NoBackup && !File.Exists(original + ".bak") ? original + ".bak" : null;
+            File.Replace(temporary, original, backup);
+            if (options.KeepMtime) File.SetLastWriteTimeUtc(original, modified);
         }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
 
-        DateTime? originalMtime = null;
-        if (options.KeepMtime)
-            originalMtime = File.GetLastWriteTimeUtc(filePath);
-
+    private static void ApplyChanges(EditOptions options, string filePath)
+    {
         using var tagFile = TagLib.File.Create(filePath);
+        if (tagFile is TagLib.Image.File imageFile) imageFile.EnsureAvailableTags();
 
         if (options.Title is not null) tagFile.Tag.Title = options.Title;
         if (options.Artists is not null) tagFile.Tag.Performers = options.Artists;
@@ -136,30 +144,55 @@ public sealed class MediaTagService : IMediaTagService
             existing.Add(pic);
         }
 
-        tagFile.Tag.Pictures = existing.ToArray();
+        if (options.RemoveCover || options.CoverPath is not null)
+            tagFile.Tag.Pictures = existing.ToArray();
+        foreach (var change in options.FieldChanges)
+            TagFieldCatalog.Find(tagFile.Tag, change.Key).Write(tagFile.Tag, change.Value);
         tagFile.Save();
+    }
 
-        if (originalMtime.HasValue)
-            File.SetLastWriteTimeUtc(filePath, originalMtime.Value);
+    private static void VerifyChanges(EditOptions options, string path)
+    {
+        using var file = TagLib.File.Create(path);
+        foreach (var change in options.FieldChanges)
+        {
+            var field = TagFieldCatalog.Find(file.Tag, change.Key);
+            var expected = field.Parse(change.Value);
+            var actual = field.Property.GetValue(file.Tag);
+            var matches = expected switch
+            {
+                null => actual is null,
+                string text => text == (actual as string ?? ""),
+                string[] values => values.SequenceEqual(actual as string[] ?? []),
+                double number when double.IsNaN(number) => actual is double read && double.IsNaN(read),
+                double number => actual is double read && Math.Abs(number - read) <= Math.Max(1, Math.Abs(number)) * 0.00001,
+                _ => Equals(expected, actual)
+            };
+            if (!matches)
+                throw new InvalidOperationException($"This format cannot reliably store the requested change to '{field.Label}'. The original file was preserved.");
+        }
     }
 
     /// <summary>Removes all tags from a media file.</summary>
     public void Clear(string filePath, bool noBackup, bool keepMtime)
     {
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException($"File not found: \"{filePath}\"");
-
-        if (!noBackup && !File.Exists(filePath + ".bak"))
-            File.Copy(filePath, filePath + ".bak");
-
-        DateTime? originalMtime = keepMtime ? File.GetLastWriteTimeUtc(filePath) : null;
-
-        using var tagFile = TagLib.File.Create(filePath);
-        tagFile.RemoveTags(TagLib.TagTypes.AllTags);
-        tagFile.Save();
-
-        if (originalMtime.HasValue)
-            File.SetLastWriteTimeUtc(filePath, originalMtime.Value);
+        Validate(new EditOptions { FilePath = filePath });
+        filePath = Path.GetFullPath(filePath);
+        var modified = File.GetLastWriteTimeUtc(filePath);
+        var temporary = Path.Combine(Path.GetDirectoryName(filePath)!, $".{Guid.NewGuid():N}.tmp{Path.GetExtension(filePath)}");
+        try
+        {
+            File.Copy(filePath, temporary);
+            using (var tagFile = TagLib.File.Create(temporary))
+            {
+                tagFile.RemoveTags(TagLib.TagTypes.AllTags);
+                tagFile.Save();
+            }
+            using (TagLib.File.Create(temporary)) { }
+            File.Replace(temporary, filePath, !noBackup && !File.Exists(filePath + ".bak") ? filePath + ".bak" : null);
+            if (keepMtime) File.SetLastWriteTimeUtc(filePath, modified);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     /// <summary>
@@ -175,6 +208,15 @@ public sealed class MediaTagService : IMediaTagService
 
         if (!File.Exists(options.FilePath))
             throw new FileNotFoundException($"File not found: \"{options.FilePath}\"");
+
+        if (PhotoMetadataService.IsPhoto(options.FilePath) && Path.GetExtension(options.FilePath).ToLowerInvariant() is not (".jpg" or ".jpeg" or ".png" or ".tif" or ".tiff"))
+            throw new InvalidOperationException("This image format is available for inspection only; writing RAW and unsupported image formats is disabled.");
+        if (options.FieldChanges.Count > 0)
+        {
+            using var file = TagLib.File.Create(options.FilePath);
+            foreach (var change in options.FieldChanges)
+                TagFieldCatalog.Find(file.Tag, change.Key).Parse(change.Value);
+        }
 
         if (options.RemoveCover && options.CoverPath is not null)
             throw new ArgumentException("Cannot use --cover and --remove-cover together.");
@@ -196,13 +238,4 @@ public sealed class MediaTagService : IMediaTagService
             throw new InvalidOperationException($"Unsupported cover format \"{extension}\". Use JPG, PNG, WebP, or BMP.");
     }
 
-    private static TagLib.PictureType ParseCoverType(string? type)
-    {
-        return type?.ToLowerInvariant() switch
-        {
-            "back" => TagLib.PictureType.BackCover,
-            "other" => TagLib.PictureType.Other,
-            _ => TagLib.PictureType.FrontCover
-        };
-    }
 }

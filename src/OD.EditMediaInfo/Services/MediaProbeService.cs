@@ -6,6 +6,15 @@ namespace OD.EditMediaInfo.Services;
 /// <summary>Renders media information in terminal tables.</summary>
 public static class MediaProbeService
 {
+    /// <summary>Formats file and artwork sizes using explicit binary units.</summary>
+    public static string FormatSize(long bytes)
+    {
+        string[] units = ["B", "KiB", "MiB", "GiB", "TiB"];
+        double size = bytes;
+        int index = 0;
+        while (size >= 1024 && index < units.Length - 1) { size /= 1024; index++; }
+        return $"{size:0.##} {units[index]} ({bytes} bytes)";
+    }
     /// <summary>Renders technical details, tags, and cover summaries.</summary>
     public static void Render(MediaInfo info)
     {
@@ -17,13 +26,26 @@ public static class MediaProbeService
         tech.AddRow("Format", Markup.Escape(info.Format));
         tech.AddRow("Codec", Markup.Escape(string.IsNullOrWhiteSpace(info.Codec) ? "-" : info.Codec));
         tech.AddRow("Duration", info.Duration.TotalSeconds > 0 ? $"{info.Duration:hh\\:mm\\:ss\\.ff} ({info.Duration.TotalSeconds:F1}s)" : "-");
-        tech.AddRow("Bitrate", info.AudioBitrate > 0 ? $"{info.AudioBitrate} kb/s" : "-");
+        tech.AddRow("Audio Bitrate", info.AudioBitrate > 0 ? $"{info.AudioBitrate} kb/s" : "-");
         tech.AddRow("Sample Rate", info.AudioSampleRate > 0 ? $"{info.AudioSampleRate} Hz" : "-");
         tech.AddRow("Channels", info.AudioChannels > 0 ? info.AudioChannels.ToString() : "-");
         if (info.AudioBitsPerSample.HasValue)
             tech.AddRow("Bits/Sample", info.AudioBitsPerSample.Value.ToString());
-        tech.AddRow("File Size", $"{info.FileSize / 1024.0:F1} KB ({info.FileSize} bytes)");
+        tech.AddRow("File Size", FormatSize(info.FileSize));
         AnsiConsole.Write(tech);
+
+        foreach (var group in info.Details.Properties.GroupBy(p => p.Section))
+        {
+            var table = new Table().Border(TableBorder.Rounded).Title(Markup.Escape(group.Key));
+            table.AddColumn("Property");
+            table.AddColumn("Value");
+            table.AddColumn("Source");
+            foreach (var property in group)
+                table.AddRow(Markup.Escape(property.Name), Markup.Escape(property.Value ?? "Unknown"), Markup.Escape(property.Source));
+            AnsiConsole.Write(table);
+        }
+        foreach (var diagnostic in info.Details.Diagnostics)
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(diagnostic)}[/]");
 
         // Tags table
         var tags = new Table().Border(TableBorder.Rounded).Title("[yellow]Tags[/]");
