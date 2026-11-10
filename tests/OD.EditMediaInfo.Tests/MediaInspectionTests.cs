@@ -185,21 +185,69 @@ public sealed class MediaInspectionTests
 
     /// <summary>Checks a dense grid fits a terminal page and escapes metadata markup and control sequences.</summary>
     [Theory]
-    [InlineData(80)]
-    [InlineData(120)]
-    public void Grid_RenderFitsViewport(int width)
+    [InlineData(76, 18)]
+    [InlineData(120, 24)]
+    public void Grid_RenderFitsViewport(int width, int height)
     {
         using var writer = new StringWriter();
         var console = AnsiConsole.Create(new AnsiConsoleSettings { Ansi = AnsiSupport.No, ColorSystem = ColorSystemSupport.NoColors, Out = new AnsiConsoleOutput(writer) });
         console.Profile.Width = width;
-        using var model = new EditorViewModel(EmptyInfo("sample.jpg"), Enumerable.Range(0, 30).Select(i => new EditorField($"{i}", "Overview", $"Property {i}", "[red]value[/]\u001b[2J" + new string('x', 200), "EXIF")));
-        TerminalEditorView.Render(console, model, "Overview", 0, 8, "Ready");
-        var lines = writer.ToString().Replace("\r", "").Split('\n');
-        Assert.True(lines.Length <= 23, $"Rendered {lines.Length} lines: {writer}");
-        Assert.All(lines, line => Assert.True(line.Length <= width, $"Line exceeds {width}: {line}"));
+        var fileName = new string('界', 80) + ".jpg";
+        using var model = new EditorViewModel(EmptyInfo(fileName), Enumerable.Range(0, 30).Select(i => new EditorField($"{i}", "Overview", $"Property {i}", "[red]value[/]\u001b[2J" + new string('界', 200), "EXIF")));
+        var pageSize = TerminalEditorView.GetPageSize(height);
+        TerminalEditorView.Render(console, model, "Overview", 0, pageSize, "Ready");
+        var lines = writer.ToString().TrimEnd('\r', '\n').Replace("\r", "").Split('\n');
+        Assert.True(lines.Length < height, $"Rendered {lines.Length} lines: {writer}");
+        Assert.All(lines, line =>
+        {
+            var cells = new Spectre.Console.Rendering.Segment(line, Style.Plain).CellCount();
+            Assert.True(cells < width, $"Line exceeds the usable width at {cells} cells: {line}");
+        });
         Assert.DoesNotContain('\u001b', writer.ToString());
         Assert.Contains("Read-only", writer.ToString());
-        Assert.DoesNotContain("Property 8", writer.ToString());
+        Assert.DoesNotContain($"Property {pageSize}", writer.ToString());
+    }
+
+    /// <summary>Keeps pending edits distinguishable in the grid and review without ANSI color.</summary>
+    [Fact]
+    public void Grid_LabelsPendingEditsAndShowsCountAcrossSections()
+    {
+        using var photo = CreatePhoto();
+        using var file = TagLib.File.Create(photo.Path);
+        var title = new EditorField("Title", "Metadata", "Title", "Original title", "TagLibSharp", TagFieldCatalog.Find(file.Tag, "Title"));
+        var author = new EditorField("Author", "Metadata", "Author", "Original author", "TagLibSharp", TagFieldCatalog.Find(file.Tag, "Image.Creator"));
+        var resolution = new EditorField("Resolution", "Overview", "Resolution", "160 × 90", "Header");
+        using var model = new EditorViewModel(EmptyInfo(photo.Path), [title, author, resolution]);
+        title.Replace("Updated title");
+        author.Remove();
+
+        using var writer = new StringWriter();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings { Ansi = AnsiSupport.No, ColorSystem = ColorSystemSupport.NoColors, Out = new AnsiConsoleOutput(writer) });
+        console.Profile.Width = 76;
+        TerminalEditorView.Render(console, model, "Metadata", 0, 4, "Ready");
+        Assert.Contains("Saved value", writer.ToString());
+        Assert.Contains("Pending value", writer.ToString());
+        Assert.Contains("Original title", writer.ToString());
+        Assert.Contains("Updated title", writer.ToString());
+        Assert.Contains("Replace", writer.ToString());
+        Assert.Contains("Remove", writer.ToString());
+
+        writer.GetStringBuilder().Clear();
+        TerminalEditorView.Render(console, model, "Overview", 0, 4, "Ready");
+        Assert.Contains("2 unsaved changes", writer.ToString());
+        Assert.DoesNotContain("Updated title", writer.ToString());
+
+        writer.GetStringBuilder().Clear();
+        TerminalEditorView.RenderSaveReview(console, model, [title, author]);
+        Assert.Contains("Before  Original title", writer.ToString());
+        Assert.Contains("After   Updated title", writer.ToString());
+        Assert.Contains("(remove field)", writer.ToString());
+        Assert.Contains("Save all", writer.ToString());
+
+        writer.GetStringBuilder().Clear();
+        model.RevertAll();
+        TerminalEditorView.Render(console, model, "Metadata", 0, 4, "Ready");
+        Assert.Contains("No unsaved changes", writer.ToString());
     }
 
     /// <summary>Ensures legacy audio tag editing and modification-time preservation remain supported.</summary>

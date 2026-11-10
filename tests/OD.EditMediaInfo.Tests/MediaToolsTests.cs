@@ -1,11 +1,12 @@
 using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
+using Microsoft.Win32;
 using OD.EditMediaInfo.Services;
 
 namespace OD.EditMediaInfo.Tests;
 
-/// <summary>Validates the optional installer without downloading or executing software or changing the registry.</summary>
+/// <summary>Validates analyzer installation and Explorer registration in isolated locations.</summary>
 public sealed class MediaToolsTests
 {
     /// <summary>Installs only the expected files and preserves an existing analyzer executable.</summary>
@@ -51,6 +52,60 @@ public sealed class MediaToolsTests
     public void ExplorerCommand_QuotesBothPaths()
     {
         Assert.Equal("\"E:\\Media tools & photos\\odmedia.exe\" \"%1\"", MediaToolsService.ExplorerCommand(@"E:\Media tools & photos\odmedia.exe"));
+    }
+
+    /// <summary>Migrates the wildcard verb and removes only odmedia's registrations on uninstall.</summary>
+    [Fact]
+    public void ExplorerMenu_RegistersOnlyMediaAndCleansUpOldVerbs()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        const string executable = @"E:\Media tools\odmedia.exe";
+        const string associations = "SystemFileAssociations";
+        const string verb = @"shell\OD.EditMediaInfo";
+        var testKey = $@"Software\OD.EditMediaInfo.Tests-{Guid.NewGuid():N}";
+        try
+        {
+            using var classes = Registry.CurrentUser.CreateSubKey(testKey);
+            using (var legacy = classes.CreateSubKey($@"*\{verb}\command"))
+                legacy.SetValue("", "old odmedia command");
+            using (var other = classes.CreateSubKey($@"{associations}\.jpg\shell\OtherApp"))
+                other.SetValue("", "Another app");
+            using (var association = classes.CreateSubKey(".jpg"))
+                association.SetValue("", "ExistingPhotoApp");
+
+            MediaToolsService.InstallExplorerMenu(classes, executable, analyzerAvailable: true);
+            Assert.Null(classes.OpenSubKey($@"*\{verb}"));
+            foreach (var extension in new[] { ".mp3", ".mp4", ".jpg", ".heic", ".mov" })
+            {
+                using var command = classes.OpenSubKey($@"{associations}\{extension}\{verb}\command");
+                Assert.NotNull(command);
+                Assert.Equal(MediaToolsService.ExplorerCommand(executable), command.GetValue(""));
+            }
+            Assert.Null(classes.OpenSubKey($@"{associations}\.txt\{verb}"));
+            Assert.Null(classes.OpenSubKey($@"{associations}\.ts\{verb}"));
+
+            MediaToolsService.InstallExplorerMenu(classes, executable, analyzerAvailable: false);
+            Assert.Null(classes.OpenSubKey($@"{associations}\.mov\{verb}"));
+            using (var command = classes.OpenSubKey($@"{associations}\.mp3\{verb}\command"))
+                Assert.NotNull(command);
+
+            using (var legacy = classes.CreateSubKey($@"*\{verb}"))
+                legacy.SetValue("", "old odmedia command");
+            MediaToolsService.RemoveExplorerMenu(classes);
+            MediaToolsService.RemoveExplorerMenu(classes);
+            Assert.Null(classes.OpenSubKey($@"*\{verb}"));
+            Assert.Null(classes.OpenSubKey($@"{associations}\.mp3\{verb}"));
+            Assert.Null(classes.OpenSubKey($@"{associations}\.jpg\{verb}"));
+            using var otherApp = classes.OpenSubKey($@"{associations}\.jpg\shell\OtherApp");
+            Assert.Equal("Another app", otherApp?.GetValue(""));
+            using var defaultAssociation = classes.OpenSubKey(".jpg");
+            Assert.Equal("ExistingPhotoApp", defaultAssociation?.GetValue(""));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(testKey, throwOnMissingSubKey: false);
+        }
     }
 
     /// <summary>Targets the actual executable directory rather than a single-file extraction directory.</summary>

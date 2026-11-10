@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using Microsoft.Win32;
 
@@ -8,7 +10,16 @@ namespace OD.EditMediaInfo.Services;
 public static class MediaToolsService
 {
     private const string DownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
-    private const string MenuKey = @"Software\Classes\*\shell\OD.EditMediaInfo";
+    private const string UserClasses = @"Software\Classes";
+    private const string FileAssociations = "SystemFileAssociations";
+    private const string ExplorerVerb = @"shell\OD.EditMediaInfo";
+    private const int ShellAssociationChanged = 0x08000000;
+    private const uint ShellItemIdList = 0;
+    private static readonly string[] AnalyzerExtensions =
+    [
+        ".3g2", ".3gp", ".ac3", ".amr", ".au", ".caf", ".dts", ".eac3",
+        ".flv", ".m2ts", ".mov", ".mts", ".mxf", ".vob"
+    ];
 
     /// <summary>Gets the real executable folder even when the single-file runtime extracts bundled content.</summary>
     public static string ExecutableDirectory => GetExecutableDirectory(Environment.ProcessPath, AppContext.BaseDirectory);
@@ -124,19 +135,38 @@ public static class MediaToolsService
         }
     }
 
-    /// <summary>Registers a quoted, single-file Explorer command for the current user only.</summary>
+    /// <summary>Registers a single-file Explorer command for recognized media extensions and the current user only.</summary>
     public static void InstallExplorerMenu()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Explorer integration requires Windows.");
         var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate odmedia.exe.");
         if (!Path.GetFileNameWithoutExtension(executable).Equals("odmedia", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Run this command using odmedia.exe, rather than dotnet.");
-        using var key = Registry.CurrentUser.CreateSubKey(MenuKey);
-        key.SetValue("", "Inspect metadata with odmedia");
-        key.SetValue("Icon", $"\"{executable}\",0");
-        key.SetValue("MultiSelectModel", "Single");
-        using var command = key.CreateSubKey("command");
-        command.SetValue("", ExplorerCommand(executable));
+        using var classes = Registry.CurrentUser.CreateSubKey(UserClasses);
+        InstallExplorerMenu(classes, executable, FFprobeService.FindExecutable() is not null);
+        SHChangeNotify(ShellAssociationChanged, ShellItemIdList, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    /// <summary>Installs the verb under extension associations and removes superseded registrations.</summary>
+    [SupportedOSPlatform("windows")]
+    internal static void InstallExplorerMenu(RegistryKey classes, string executable, bool analyzerAvailable)
+    {
+        var extensions = TagLib.SupportedMimeType.AllExtensions.Select(extension => "." + extension)
+            .Concat(PhotoMetadataService.RecognizedExtensions)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (analyzerAvailable) extensions.UnionWith(AnalyzerExtensions);
+
+        using var associations = classes.CreateSubKey(FileAssociations);
+        foreach (var extension in extensions)
+        {
+            using var key = associations.CreateSubKey($@"{extension}\{ExplorerVerb}");
+            using var command = key.CreateSubKey("command");
+            command.SetValue("", ExplorerCommand(executable));
+            key.SetValue("", "Inspect metadata with odmedia");
+            key.SetValue("Icon", $"\"{executable}\",0");
+            key.SetValue("MultiSelectModel", "Single");
+        }
+        RemoveExplorerMenu(classes, extensions);
     }
 
     /// <summary>Builds the Explorer command without a shell, preserving spaces and special characters in paths.</summary>
@@ -146,6 +176,29 @@ public static class MediaToolsService
     public static void RemoveExplorerMenu()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Explorer integration requires Windows.");
-        Registry.CurrentUser.DeleteSubKeyTree(MenuKey, throwOnMissingSubKey: false);
+        using var classes = Registry.CurrentUser.OpenSubKey(UserClasses, writable: true);
+        if (classes is null) return;
+
+        RemoveExplorerMenu(classes);
+        SHChangeNotify(ShellAssociationChanged, ShellItemIdList, IntPtr.Zero, IntPtr.Zero);
     }
+
+    /// <summary>Removes the legacy wildcard and any per-extension verbs outside the active set.</summary>
+    [SupportedOSPlatform("windows")]
+    internal static void RemoveExplorerMenu(RegistryKey classes, HashSet<string>? keep = null)
+    {
+        classes.DeleteSubKeyTree($@"*\{ExplorerVerb}", throwOnMissingSubKey: false);
+        using var associations = classes.OpenSubKey(FileAssociations, writable: true);
+        if (associations is null) return;
+
+        foreach (var extension in associations.GetSubKeyNames())
+        {
+            if (extension.StartsWith('.') && keep?.Contains(extension) != true)
+                associations.DeleteSubKeyTree($@"{extension}\{ExplorerVerb}", throwOnMissingSubKey: false);
+        }
+    }
+
+    [DllImport("shell32.dll", ExactSpelling = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern void SHChangeNotify(int eventId, uint flags, IntPtr firstItem, IntPtr secondItem);
 }

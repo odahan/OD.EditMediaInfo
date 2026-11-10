@@ -31,8 +31,10 @@ Open a file with `odmedia "path to media"`, or launch `odmedia` and paste or dra
 | Ctrl+Z | Revert the selected field |
 | Ctrl+S or F6 | Review and save all pending changes |
 | F4 | Actions: artwork, presets, export, analyzer installation, Explorer integration, backup settings |
-| Ctrl+O | Open another file |
+| Ctrl+O | Open another file (also available in F4 Actions) |
 | Esc | Quit, with Save / Discard / Cancel when there are pending changes |
+
+To switch files, press **Ctrl+O** or choose **Open another file…** in **F4 → Actions**. Drag the next file into the terminal or enter its path, then press **Enter**. Press **Esc** at the path prompt to return to the current file. If the next file opens successfully and there are pending edits, choose **Save**, **Discard**, or **Cancel** before switching.
 
 Each editable field has a **Keep**, **Replace**, or **Remove** state. Empty or whitespace-only editor input leaves its pending state unchanged; an invisible space never deletes a field. Use Delete to remove and Ctrl+Z to restore. Editors support Ctrl+A to clear input, Ctrl+Enter for multiline text, and Esc to cancel. Lists use semicolons; numeric values use a decimal point; exposure accepts fractions such as `1/125`; camera dates use `yyyy-MM-dd HH:mm:ss` without assuming a timezone.
 
@@ -73,7 +75,7 @@ odmedia explorer install
 odmedia explorer remove
 ```
 
-These actions are also available under F4. They add/remove **Inspect metadata with odmedia** for the current user, without administrator rights or changes to default file associations. The entry is available for files; unsupported types display an explanatory error. It opens a single selected file in the interactive terminal. On Windows 11, the classic entry is under **Show more options**. Run installation from odmedia.exe in its permanent location; register again after moving it. Registration is optional and is never performed automatically on startup.
+These actions are also available under F4. They add or remove **Inspect metadata with odmedia** for the current user, without administrator rights or changes to default file associations. The entry opens one file with a supported media extension in the interactive terminal. Additional formats such as MOV are registered when FFprobe is available. On Windows 11, the classic entry is under **Show more options**. Register from the executable's permanent location and run registration again after moving it or installing the optional analyzer. Both actions remove the previous all-files entry.
 
 ## Installation
 
@@ -187,6 +189,8 @@ Existing top-level JSON fields remain available, including the legacy audio-only
 
 ## Build
 
+Double-click `Publish.BAT` in File Explorer to run `build.ps1` and create `publish/odmedia.exe`. The window stays open so you can read the result.
+
 ```powershell
 dotnet build src/OD.EditMediaInfo -c Release -r win-x64 -m:1
 dotnet publish src/OD.EditMediaInfo -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish -m:1
@@ -201,7 +205,7 @@ Run tests with `dotnet test OD.EditMediaInfo.slnx -m:1`.
 
 ```
 src/OD.EditMediaInfo/
-  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile, v2.0.2)
+  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile, v2.0.3)
   Program.cs (dispatch + interactive detection)
   Commands/InfoCommand, SetCommand, ClearCommand, PresetCommand
   Services/IMediaTagService, MediaTagService, MediaProbeService, InteractiveEditor, PresetService, ErrorHandler

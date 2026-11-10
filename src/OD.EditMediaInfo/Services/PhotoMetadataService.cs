@@ -16,6 +16,9 @@ public static class PhotoMetadataService
         ".arw", ".sr2", ".srf", ".orf", ".rw2", ".raf", ".pef", ".raw", ".psd"
     };
 
+    /// <summary>Gets the extensions routed to the photo metadata reader.</summary>
+    internal static IEnumerable<string> RecognizedExtensions => Extensions;
+
     /// <summary>Determines whether a path should be inspected as a still image.</summary>
     public static bool IsPhoto(string path) => Extensions.Contains(Path.GetExtension(path));
 

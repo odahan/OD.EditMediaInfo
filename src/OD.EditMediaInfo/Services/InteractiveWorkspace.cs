@@ -18,53 +18,15 @@ public static partial class InteractiveEditor
         var previousControlC = Console.TreatControlCAsInput;
         var previousCursor = !OperatingSystem.IsWindows() || Console.CursorVisible;
         Console.TreatControlCAsInput = true;
-        string? path = initialInput?.Trim().Trim('"');
         try
         {
-            while (true)
+            var model = await OpenMediaAsync(initialInput, replacing: false, cancellationToken);
+            while (model is not null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (string.IsNullOrWhiteSpace(path))
-                {
-                    path = ReadInput("Open media", "Media file path (drag and drop supported). Empty to quit.", "")?.Trim().Trim('"');
-                    if (string.IsNullOrWhiteSpace(path)) return 0;
-                }
-                EditorViewModel model;
-                try
-                {
-                    Console.Clear();
-                    AnsiConsole.WriteLine("Inspecting media...");
-                    model = new EditorViewModel(new MediaTagService().Read(path));
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    ShowMessage("Unable to open media", ex.Message);
-                    if (FFprobeService.FindExecutable() is null)
-                    {
-                        var recovery = Choose("Media analysis", ["Choose another file", "Install media analyzer and retry", "Quit"]);
-                        if (recovery == "Quit") return 0;
-                        if (recovery == "Install media analyzer and retry")
-                        {
-                            try
-                            {
-                                if (await InstallAnalyzerInteractiveAsync(cancellationToken)) continue;
-                            }
-                            catch (Exception installError) when (installError is not OperationCanceledException)
-                            {
-                                ShowMessage("Installation failed", installError.Message);
-                            }
-                        }
-                    }
-                    path = null;
-                    continue;
-                }
-                using (model)
-                {
-                    var result = await RunWorkspaceAsync(model, cancellationToken);
-                    if (result == "quit") return 0;
-                    path = result == "open" ? null : model.Info.FilePath;
-                }
+                using var current = model;
+                model = await RunWorkspaceAsync(current, cancellationToken);
             }
+            return 0;
         }
         catch (OperationCanceledException) { return 130; }
         finally
@@ -75,7 +37,84 @@ public static partial class InteractiveEditor
         }
     }
 
-    private static async Task<string> RunWorkspaceAsync(EditorViewModel model, CancellationToken token)
+    /// <summary>Prompts for a readable file, preserving the caller's workspace until one is loaded.</summary>
+    private static async Task<EditorViewModel?> OpenMediaAsync(string? path, bool replacing, CancellationToken token)
+    {
+        path = path?.Trim().Trim('"');
+        var title = replacing ? "Open another file" : "Open media";
+        var hint = replacing ? "Drag a file here or enter its path. Esc returns to the current file."
+            : "Drag a file here or enter its path. Empty to quit.";
+        var back = replacing ? "Back to current file" : "Quit";
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path = ReadInput(title, hint, "")?.Trim().Trim('"');
+                if (string.IsNullOrWhiteSpace(path)) return null;
+            }
+            try
+            {
+                return ReadEditor(path);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                ShowMessage("Unable to open media", ex.Message);
+                if (FFprobeService.FindExecutable() is null)
+                {
+                    var recovery = Choose("Media analysis", ["Choose another file", "Install media analyzer and retry", back]);
+                    if (recovery == back) return null;
+                    if (recovery == "Install media analyzer and retry")
+                    {
+                        try
+                        {
+                            if (await InstallAnalyzerInteractiveAsync(token)) continue;
+                        }
+                        catch (Exception installError) when (installError is not OperationCanceledException)
+                        {
+                            ShowMessage("Installation failed", installError.Message);
+                        }
+                    }
+                }
+                path = null;
+            }
+        }
+    }
+
+    private static EditorViewModel ReadEditor(string path)
+    {
+        Console.Clear();
+        AnsiConsole.WriteLine("Inspecting media...");
+        return new EditorViewModel(new MediaTagService().Read(path));
+    }
+
+    /// <summary>Loads the replacement before asking what to do with edits to the current file.</summary>
+    private static async Task<EditorViewModel?> TryOpenAnotherFileAsync(EditorViewModel current, CancellationToken token)
+    {
+        var candidate = await OpenMediaAsync(null, replacing: true, token);
+        if (candidate is null) return null;
+
+        var keepCandidate = false;
+        try
+        {
+            var hadPendingChanges = current.PendingCount > 0;
+            if (!CanLeave(current)) return null;
+
+            var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (hadPendingChanges && current.PendingCount == 0 &&
+                string.Equals(current.Info.FilePath, candidate.Info.FilePath, pathComparison))
+                return ReadEditor(candidate.Info.FilePath);
+
+            keepCandidate = true;
+            return candidate;
+        }
+        finally
+        {
+            if (!keepCandidate) candidate.Dispose();
+        }
+    }
+
+    private static async Task<EditorViewModel?> RunWorkspaceAsync(EditorViewModel model, CancellationToken token)
     {
         int sectionIndex = 0;
         int selection = 0;
@@ -86,7 +125,7 @@ public static partial class InteractiveEditor
             var section = model.Sections[sectionIndex];
             var fields = model.VisibleFields(section);
             selection = Math.Clamp(selection, 0, Math.Max(0, fields.Count - 1));
-            int pageSize = Math.Max(1, Console.WindowHeight - 13);
+            int pageSize = TerminalEditorView.GetPageSize(Console.WindowHeight);
             Console.Clear();
             Console.CursorVisible = false;
             if (Console.WindowWidth < 76 || Console.WindowHeight < 18)
@@ -102,15 +141,20 @@ public static partial class InteractiveEditor
                 }
                 else if (key.Key == ConsoleKey.Escape || control && key.Key == ConsoleKey.C)
                 {
-                    if (CanLeave(model)) return "quit";
+                    if (CanLeave(model)) return null;
                 }
-                else if (control && key.Key == ConsoleKey.O)
+                else if (key.Key == ConsoleKey.F4 || control && key.Key == ConsoleKey.O)
                 {
-                    if (CanLeave(model)) return "open";
+                    var action = key.Key == ConsoleKey.F4 ? await RunActionsAsync(model, token) : WorkspaceAction.Open;
+                    if (action == WorkspaceAction.Reload)
+                        return await OpenMediaAsync(model.Info.FilePath, replacing: false, token);
+                    if (action == WorkspaceAction.Open && await TryOpenAnotherFileAsync(model, token) is { } next)
+                        return next;
                 }
                 else if (control && key.Key == ConsoleKey.S || key.Key == ConsoleKey.F6)
                 {
-                    if (ReviewAndSave(model)) return "reload";
+                    if (ReviewAndSave(model))
+                        return await OpenMediaAsync(model.Info.FilePath, replacing: false, token);
                 }
                 else if (key.Key is ConsoleKey.Tab or ConsoleKey.LeftArrow or ConsoleKey.RightArrow)
                 {
@@ -140,10 +184,6 @@ public static partial class InteractiveEditor
                 {
                     model.ModifiedOnly = !model.ModifiedOnly;
                     selection = 0;
-                }
-                else if (key.Key == ConsoleKey.F4)
-                {
-                    if (await RunActionsAsync(model, token)) return "reload";
                 }
                 else if (fields.Count > 0)
                 {
@@ -199,17 +239,8 @@ public static partial class InteractiveEditor
         while (true)
         {
             Console.Clear();
-            AnsiConsole.MarkupLine("[bold cyan]Review pending changes[/]");
-            AnsiConsole.WriteLine($"Backup: {(model.CreateBackup ? "create .bak if absent" : "disabled")} | Keep modification time: {model.KeepMtime}");
             int size = Math.Max(1, (Console.WindowHeight - 8) / 3);
-            foreach (var field in modified.Skip(offset).Take(size))
-            {
-                AnsiConsole.WriteLine($"{field.Label}: {field.Action}");
-                AnsiConsole.WriteLine("  Before: " + Plain(field.CurrentValue, Console.WindowWidth - 11));
-                AnsiConsole.WriteLine("  After:  " + Plain(field.Action == "Remove" ? "(remove field)" : field.Replacement ?? "", Console.WindowWidth - 11));
-            }
-            AnsiConsole.WriteLine(Plain(model.CoverAction, Console.WindowWidth - 1));
-            AnsiConsole.WriteLine($"{model.PendingCount} changes · ↑↓ Scroll · Enter Save all · Esc Back");
+            TerminalEditorView.RenderSaveReview(AnsiConsole.Console, model, modified.Skip(offset).Take(size));
             var key = Console.ReadKey(true);
             if (key.Key == ConsoleKey.Escape) return false;
             if (key.Key == ConsoleKey.DownArrow) offset = Math.Min(Math.Max(0, modified.Length - size), offset + size);
@@ -221,9 +252,12 @@ public static partial class InteractiveEditor
         }
     }
 
-    private static async Task<bool> RunActionsAsync(EditorViewModel model, CancellationToken token)
+    private enum WorkspaceAction { Stay, Open, Reload }
+
+    private static async Task<WorkspaceAction> RunActionsAsync(EditorViewModel model, CancellationToken token)
     {
-        var actions = new List<string> { "Back", "User manual", "Install media analyzer", "Add Explorer context menu", "Remove Explorer context menu", "Export complete JSON" };
+        const string openAnotherFile = "Open another file…";
+        var actions = new List<string> { openAnotherFile, "Back", "User manual", "Install media analyzer", "Add Explorer context menu", "Remove Explorer context menu", "Export complete JSON" };
         if (model.Info.Details.Kind == "Video") actions.Add("Analyze cadence (up to 300 frames)");
         if (model.Info.Details.CanWriteTags)
         {
@@ -237,6 +271,7 @@ public static partial class InteractiveEditor
         var action = Choose("Actions", actions);
         switch (action)
         {
+            case openAnotherFile: return WorkspaceAction.Open;
             case "User manual": OpenManual(); break;
             case "Enable capture and GPS editing":
                 foreach (var field in model.Fields) field.EnableCaptureEditing();
@@ -251,12 +286,12 @@ public static partial class InteractiveEditor
             case "Install media analyzer":
                 if (!await InstallAnalyzerInteractiveAsync(token)) break;
                 ShowMessage("Analyzer installed", "FFmpeg and FFprobe are available beside odmedia.exe.");
-                if (model.PendingCount == 0) return true;
+                if (model.PendingCount == 0) return WorkspaceAction.Reload;
                 ShowMessage("Analysis", "Save or discard the pending edits, then reopen the file to refresh its technical information.");
                 break;
             case "Add Explorer context menu":
                 MediaToolsService.InstallExplorerMenu();
-                ShowMessage("Explorer integration", "Added for this user. On Windows 11, use Show more options. Register again if you move odmedia.exe.");
+                ShowMessage("Explorer integration", "Added for supported media files for this user. On Windows 11, use Show more options. Register again if you move odmedia.exe or install the media analyzer.");
                 break;
             case "Remove Explorer context menu":
                 MediaToolsService.RemoveExplorerMenu();
@@ -291,7 +326,7 @@ public static partial class InteractiveEditor
                     File.WriteAllText(path, JsonSerializer.Serialize(model.Info, new JsonSerializerOptions { WriteIndented = true }));
                 break;
         }
-        return false;
+        return WorkspaceAction.Stay;
     }
 
     private static async Task<bool> InstallAnalyzerInteractiveAsync(CancellationToken token)

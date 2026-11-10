@@ -263,7 +263,7 @@ explorerInstallCmd.SetHandler(context =>
     try
     {
         MediaToolsService.InstallExplorerMenu();
-        Console.WriteLine("Explorer context menu added for this user. On Windows 11, use Show more options.");
+        Console.WriteLine("Explorer context menu added for supported media files for this user. On Windows 11, use Show more options.");
     }
     catch (Exception ex) { context.ExitCode = ErrorHandler.Fail(ex.Message, 2); }
 });

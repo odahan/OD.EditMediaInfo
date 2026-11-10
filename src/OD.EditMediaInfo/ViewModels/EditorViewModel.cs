@@ -21,7 +21,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public bool ModifiedOnly { get => modifiedOnly; set => SetProperty(ref modifiedOnly, value); }
     public bool KeepMtime { get; set; }
     public bool CreateBackup { get; set; } = true;
-    public int PendingCount => Fields.Count(f => f.IsModified) + (coverPath is not null || removeCover ? 1 : 0);
+    /// <summary>Indicates whether artwork will be replaced or removed on save.</summary>
+    public bool HasPendingCoverChange => coverPath is not null || removeCover;
+    public int PendingCount => Fields.Count(f => f.IsModified) + (HasPendingCoverChange ? 1 : 0);
     public string CoverAction => removeCover ? "Remove all artwork" : coverPath is not null ? $"Replace {coverType.ToString().ToLowerInvariant()} artwork: {coverPath}" : "Keep artwork";
     public string[] Sections => new[] { "Overview", "General", "Video", "Audio", "Image", "Capture", "Location", "Subtitles", "Chapters", "Metadata", "Images", "Color", "Advanced" }
         .Where(s => Fields.Any(f => f.Section == s)).ToArray();
