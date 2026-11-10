@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/OD.EditMediaInfo.Core/OD.EditMediaInfo.Core.csproj" />
+    <Project Path="src/OD.EditMediaInfo.Gui/OD.EditMediaInfo.Gui.csproj" />
     <Project Path="src/OD.EditMediaInfo/OD.EditMediaInfo.csproj" />
   </Folder>
   <Folder Name="/tests/">

@@ -1,8 +1,15 @@
-# odmedia — Media Info Editor CLI (.NET 10 win-x64)
+# OD.EditMediaInfo — Media metadata editor for Windows
 
-Self-contained Windows x64 executable for inspecting audio, video, and photographs and editing supported metadata. The interactive terminal workspace uses sections, search, separate saved and pending values, and grouped saves. Photo metadata extraction is built in. Extended audio/video analysis uses optional FFprobe, installable directly from the application without administrator rights.
+OD.EditMediaInfo 3.0.0 ships two self-contained Windows x64 executables. Use `odmedia-gui.exe` for the graphical workspace and `odmedia.exe` for the CLI and interactive terminal. Both can inspect audio, video, and photographs and edit supported metadata. Photo inspection is built in. Optional FFprobe adds audio and video analysis.
 
-## Version 2 workspace
+## Graphical workspace
+
+Launch `odmedia-gui.exe` and select **Open…** or drop a file onto the window. Select a section tab to browse its fields. **Search fields** and **Pending only** work across sections.
+
+Select an editable field and use **Edit…**, double-click it, or press F2. **Remove value** stages a deletion and **Revert field** discards that field’s pending change. **Save…** opens a before-and-after review. The first save keeps the original as a `.bak` file. When switching files or closing the window, choose **Save**, **Discard**, or **Cancel** if changes are pending.
+
+## Terminal workspace
+
 
 ### Offline user manual (English / French)
 
@@ -83,15 +90,11 @@ In the interactive workspace, **F4 → Actions** offers **Add Explorer context m
 
 Register from the executable's permanent location. Register again if you move it or install the optional analyzer. Both registration and removal clear the previous all-files entry.
 
+In the graphical workspace, choose **Explorer → Use this app in the context menu**. Both interfaces use the same **Inspect metadata with odmedia** entry. The last registration determines which executable Explorer opens. The CLI command `odmedia explorer remove` removes the shared entry.
+
 ## Installation
 
-**For immediate use on Windows x64, just download `odmedia.exe` from [Releases](https://github.com/odahan/OD.EditMediaInfo/releases) — no build required.**
-
-1. Go to **Releases** → download `odmedia.exe` (self-contained; size depends on the release)
-2. Run directly: double-click or `odmedia.exe --help`
-3. Optional: add to PATH
-
-> Building from source is only needed for development. See [Build](#build) below.
+Download the Windows x64 executables from [Releases](https://github.com/odahan/OD.EditMediaInfo/releases) and keep them in the same folder. They share the `presets` subfolder and use the same optional `ffprobe.exe` and `ffmpeg.exe` installed beside them. You can move the entire folder to a different location. The `ODMEDIA_PRESET_DIR` and `ODMEDIA_FFPROBE` environment variables override the portable defaults.
 
 ## License and support
 
@@ -195,29 +198,21 @@ Existing top-level JSON fields remain available, including the legacy audio-only
 
 ## Build
 
-Double-click `Publish.BAT` in File Explorer to run `build.ps1` and create `publish/odmedia.exe`. The window stays open so you can read the result.
+Double-click `Publish.BAT` in File Explorer or run `.\build.ps1` from PowerShell. One run publishes both self-contained Windows x64 executables, `odmedia.exe` and `odmedia-gui.exe`, to `Publish/` beside the scripts.
 
 ```powershell
-dotnet build src/OD.EditMediaInfo -c Release -r win-x64 -m:1
-dotnet publish src/OD.EditMediaInfo -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish -m:1
-.\publish\odmedia.exe --help
+dotnet build OD.EditMediaInfo.slnx -c Release -m:1
+dotnet test OD.EditMediaInfo.slnx -m:1
+.\build.ps1
+.\Publish\odmedia.exe --help
+.\Publish\odmedia-gui.exe
 ```
 
-Prerequisites: .NET SDK 10.0.400 or compatible newer SDK. Dependencies include Spectre.Console 0.49.1, TagLibSharp 2.3.0, MetadataExtractor 2.9.3, and CommunityToolkit.Mvvm 8.4.0.
-
-Run tests with `dotnet test OD.EditMediaInfo.slnx -m:1`.
+Prerequisites are .NET SDK 10.0.400 or a compatible newer SDK and Windows x64.
 
 ## Structure
 
-```
-src/OD.EditMediaInfo/
-  OD.EditMediaInfo.csproj (AssemblyName odmedia, SelfContained, SingleFile, v2.0.3)
-  Program.cs (dispatch + interactive detection)
-  Commands/InfoCommand, SetCommand, ClearCommand, PresetCommand
-  Services/IMediaTagService, MediaTagService, MediaProbeService, InteractiveEditor, PresetService, ErrorHandler
-  Models/MediaInfo, EditOptions, Preset
-  Models/MediaDetails (inspection properties, streams, chapters, capabilities)
-  ViewModels/EditorViewModel, EditorField (MVVM Toolkit, pending changes)
-  Views/TerminalEditorView (bounded terminal grid)
-  Services/MediaInspectionService, PhotoMetadataService, FFprobeService, TagFieldCatalog, MediaToolsService
-```
+- `src/OD.EditMediaInfo.Core` contains the shared inspection, metadata writing, preset services, and editing state.
+- `src/OD.EditMediaInfo` contains CLI command parsing and the interactive Spectre.Console workspace.
+- `src/OD.EditMediaInfo.Gui` contains the WPF workspace and its dialogs.
+- `tests/OD.EditMediaInfo.Tests` exercises the shared services and CLI.

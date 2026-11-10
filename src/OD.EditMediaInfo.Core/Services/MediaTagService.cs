@@ -81,6 +81,8 @@ public sealed class MediaTagService : IMediaTagService
         Validate(options);
         if (options.DryRun) return;
         var original = Path.GetFullPath(options.FilePath);
+        if ((File.GetAttributes(original) & FileAttributes.ReadOnly) != 0)
+            throw new UnauthorizedAccessException($"The media file is read-only: \"{original}\"");
         var modified = File.GetLastWriteTimeUtc(original);
         var temporary = Path.Combine(Path.GetDirectoryName(original)!, $".{Path.GetFileNameWithoutExtension(original)}.{Guid.NewGuid():N}.tmp{Path.GetExtension(original)}");
         try

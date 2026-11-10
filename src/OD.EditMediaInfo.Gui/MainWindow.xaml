@@ -1,0 +1,117 @@
+<Window x:Class="OD.EditMediaInfo.Gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OD.EditMediaInfo" Width="1120" Height="720" MinWidth="760" MinHeight="450"
+        Background="{StaticResource WindowBrush}" Foreground="{StaticResource TextBrush}"
+        AllowDrop="True" PreviewDragOver="OnDragOver" Drop="OnDrop" Closing="OnClosing">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+    </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenCommand}" />
+        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveCommand}" />
+    </Window.InputBindings>
+
+    <Grid Margin="24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel LastChildFill="True" Margin="0,0,0,20">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <Button Content="_Open…" Command="{Binding OpenCommand}" MinWidth="92" Margin="0,0,8,0" />
+                <Button Content="_Save…" Command="{Binding SaveCommand}" MinWidth="92" Margin="0,0,8,0" />
+                <Menu Background="Transparent" VerticalAlignment="Center">
+                    <MenuItem Header="E_xplorer">
+                        <MenuItem Header="Use this app in the context menu" Command="{Binding RegisterExplorerCommand}" />
+                    </MenuItem>
+                </Menu>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="{Binding FileName}" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding FilePath}" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding FilePath}" />
+            </StackPanel>
+        </DockPanel>
+
+        <DockPanel Grid.Row="1" LastChildFill="False" Margin="0,0,0,12">
+            <TextBlock x:Name="SearchLabel" Text="Search fields" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Width="235" MinHeight="32"
+                     AutomationProperties.LabeledBy="{Binding ElementName=SearchLabel}" />
+            <CheckBox Content="Pending only" IsChecked="{Binding PendingOnly}" VerticalAlignment="Center" Margin="16,0,0,0" />
+            <Button DockPanel.Dock="Right" Content="Enable capture and GPS editing"
+                    Command="{Binding EnableCaptureEditingCommand}"
+                    Visibility="{Binding CanEditCapture, Converter={StaticResource BooleanToVisibility}}" />
+        </DockPanel>
+
+        <TabControl Grid.Row="2" ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
+                    AutomationProperties.Name="Media sections">
+            <TabControl.ContentTemplate>
+                <DataTemplate>
+                    <DataGrid DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                              Style="{StaticResource MetadataGrid}" ItemsSource="{Binding Rows}"
+                              SelectedItem="{Binding SelectedField, Mode=TwoWay}" MouseDoubleClick="OnGridDoubleClick"
+                              AutomationProperties.Name="Metadata fields">
+                        <DataGrid.InputBindings>
+                            <KeyBinding Key="F2" Command="{Binding EditFieldCommand}" />
+                        </DataGrid.InputBindings>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Section" Binding="{Binding Section}" Width="110" ElementStyle="{StaticResource GridValue}" />
+                            <DataGridTextColumn Header="Field" Binding="{Binding Label}" Width="1.4*" ElementStyle="{StaticResource GridValue}" />
+                            <DataGridTextColumn Header="Saved value" Binding="{Binding CurrentValue}" Width="2*" ElementStyle="{StaticResource GridValue}" />
+                            <DataGridTextColumn Header="Pending value" Binding="{Binding Replacement}" Width="1.5*" ElementStyle="{StaticResource PendingValue}" />
+                            <DataGridTemplateColumn Header="State" Width="96" SortMemberPath="Action">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource GridValue}">
+                                                    <Setter Property="Text" Value="{Binding Action}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Action}" Value="Keep">
+                                                            <Setter Property="Text" Value="Editable" />
+                                                            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsModified}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource PendingBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsEditable}" Value="False">
+                                                            <Setter Property="Text" Value="Read-only" />
+                                                            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="110" ElementStyle="{StaticResource GridValue}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DataTemplate>
+            </TabControl.ContentTemplate>
+        </TabControl>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Height="3" Margin="0,0,16,6"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibility}}" />
+                <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding PendingCount, StringFormat={}{0} pending changes}" Foreground="{StaticResource MutedBrush}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <Button Content="_Edit…" Command="{Binding EditFieldCommand}" MinWidth="80" />
+                <Button Content="_Remove value" Command="{Binding RemoveFieldCommand}" Margin="8,0,0,0" />
+                <Button Content="_Revert field" Command="{Binding RevertFieldCommand}" Margin="8,0,0,0" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

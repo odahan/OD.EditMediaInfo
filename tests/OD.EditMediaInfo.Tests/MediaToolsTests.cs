@@ -60,7 +60,11 @@ public sealed class MediaToolsTests
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        const string executable = @"E:\Media tools\odmedia.exe";
+        using var installation = new TemporaryFolder();
+        var executable = Path.Combine(installation.Path, "odmedia.exe");
+        var gui = Path.Combine(installation.Path, "odmedia-gui.exe");
+        File.WriteAllText(executable, "");
+        File.WriteAllText(gui, "");
         const string associations = "SystemFileAssociations";
         const string verb = @"shell\OD.EditMediaInfo";
         var testKey = $@"Software\OD.EditMediaInfo.Tests-{Guid.NewGuid():N}";
@@ -85,10 +89,21 @@ public sealed class MediaToolsTests
             Assert.Null(classes.OpenSubKey($@"{associations}\.txt\{verb}"));
             Assert.Null(classes.OpenSubKey($@"{associations}\.ts\{verb}"));
 
+            MediaToolsService.InstallExplorerMenu(classes, gui, analyzerAvailable: true);
+            foreach (var extension in new[] { ".mp3", ".mp4", ".jpg", ".heic", ".mov" })
+            {
+                using var key = classes.OpenSubKey($@"{associations}\{extension}\{verb}");
+                Assert.NotNull(key);
+                Assert.Equal("Inspect metadata with odmedia", key.GetValue(""));
+                Assert.Equal($"\"{executable}\",0", key.GetValue("Icon"));
+                using var command = key.OpenSubKey("command");
+                Assert.Equal(MediaToolsService.ExplorerCommand(gui), command?.GetValue(""));
+            }
+
             MediaToolsService.InstallExplorerMenu(classes, executable, analyzerAvailable: false);
             Assert.Null(classes.OpenSubKey($@"{associations}\.mov\{verb}"));
             using (var command = classes.OpenSubKey($@"{associations}\.mp3\{verb}\command"))
-                Assert.NotNull(command);
+                Assert.Equal(MediaToolsService.ExplorerCommand(executable), command?.GetValue(""));
 
             using (var legacy = classes.CreateSubKey($@"*\{verb}"))
                 legacy.SetValue("", "old odmedia command");
@@ -113,6 +128,7 @@ public sealed class MediaToolsTests
     public void SingleFile_UsesExecutableLocationForInstalledTools()
     {
         Assert.Equal(@"E:\Media tools", MediaToolsService.GetExecutableDirectory(@"E:\Media tools\odmedia.exe", @"C:\Temp\.net\odmedia\hash"));
+        Assert.Equal(@"E:\Media tools", MediaToolsService.GetExecutableDirectory(@"E:\Media tools\odmedia-gui.exe", @"C:\Temp\.net\odmedia-gui\hash"));
         Assert.Equal(@"E:\tests", MediaToolsService.GetExecutableDirectory(@"C:\Program Files\dotnet\dotnet.exe", @"E:\tests"));
     }
 

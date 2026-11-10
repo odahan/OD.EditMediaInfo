@@ -6,15 +6,6 @@ namespace OD.EditMediaInfo.Services;
 /// <summary>Renders media information in terminal tables.</summary>
 public static class MediaProbeService
 {
-    /// <summary>Formats file and artwork sizes using explicit binary units.</summary>
-    public static string FormatSize(long bytes)
-    {
-        string[] units = ["B", "KiB", "MiB", "GiB", "TiB"];
-        double size = bytes;
-        int index = 0;
-        while (size >= 1024 && index < units.Length - 1) { size /= 1024; index++; }
-        return $"{size:0.##} {units[index]} ({bytes} bytes)";
-    }
     /// <summary>Renders technical details, tags, and cover summaries.</summary>
     public static void Render(MediaInfo info)
     {
@@ -31,7 +22,7 @@ public static class MediaProbeService
         tech.AddRow("Channels", info.AudioChannels > 0 ? info.AudioChannels.ToString() : "-");
         if (info.AudioBitsPerSample.HasValue)
             tech.AddRow("Bits/Sample", info.AudioBitsPerSample.Value.ToString());
-        tech.AddRow("File Size", FormatSize(info.FileSize));
+        tech.AddRow("File Size", MediaSizeFormatter.FormatSize(info.FileSize));
         AnsiConsole.Write(tech);
 
         foreach (var group in info.Details.Properties.GroupBy(p => p.Section))

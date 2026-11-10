@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
+using System.Security.Principal;
 using Microsoft.Win32;
 
 namespace OD.EditMediaInfo.Services;
@@ -25,8 +26,12 @@ public static class MediaToolsService
     public static string ExecutableDirectory => GetExecutableDirectory(Environment.ProcessPath, AppContext.BaseDirectory);
 
     internal static string GetExecutableDirectory(string? processPath, string fallbackDirectory) =>
-        processPath is not null && Path.GetFileNameWithoutExtension(processPath).Equals("odmedia", StringComparison.OrdinalIgnoreCase)
+        processPath is not null && IsEditorExecutable(Path.GetFileNameWithoutExtension(processPath))
             ? Path.GetDirectoryName(Path.GetFullPath(processPath))! : fallbackDirectory;
+
+    private static bool IsEditorExecutable(string name) =>
+        name.Equals("odmedia", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("odmedia-gui", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Downloads and verifies the Windows essentials archive, then installs only the two executables.</summary>
     public static async Task InstallAnalyzerAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
@@ -139,12 +144,10 @@ public static class MediaToolsService
     public static void InstallExplorerMenu()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Explorer integration requires Windows.");
-        var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate odmedia.exe.");
-        if (!Path.GetFileNameWithoutExtension(executable).Equals("odmedia", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Run this command using odmedia.exe, rather than dotnet.");
-        using var classes = Registry.CurrentUser.CreateSubKey(UserClasses);
-        InstallExplorerMenu(classes, executable, FFprobeService.FindExecutable() is not null);
-        SHChangeNotify(ShellAssociationChanged, ShellItemIdList, IntPtr.Zero, IntPtr.Zero);
+        var executable = Environment.ProcessPath;
+        if (executable is null || !IsEditorExecutable(Path.GetFileNameWithoutExtension(executable)))
+            throw new InvalidOperationException("Run Explorer registration from odmedia.exe or odmedia-gui.exe.");
+        UpdateExplorerRegistration(executable);
     }
 
     /// <summary>Installs the verb under extension associations and removes superseded registrations.</summary>
@@ -156,6 +159,8 @@ public static class MediaToolsService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (analyzerAvailable) extensions.UnionWith(AnalyzerExtensions);
 
+        var cli = Path.Combine(Path.GetDirectoryName(executable)!, "odmedia.exe");
+        var icon = File.Exists(cli) ? cli : executable;
         using var associations = classes.CreateSubKey(FileAssociations);
         foreach (var extension in extensions)
         {
@@ -163,7 +168,7 @@ public static class MediaToolsService
             using var command = key.CreateSubKey("command");
             command.SetValue("", ExplorerCommand(executable));
             key.SetValue("", "Inspect metadata with odmedia");
-            key.SetValue("Icon", $"\"{executable}\",0");
+            key.SetValue("Icon", $"\"{icon}\",0");
             key.SetValue("MultiSelectModel", "Single");
         }
         RemoveExplorerMenu(classes, extensions);
@@ -176,11 +181,40 @@ public static class MediaToolsService
     public static void RemoveExplorerMenu()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Explorer integration requires Windows.");
-        using var classes = Registry.CurrentUser.OpenSubKey(UserClasses, writable: true);
-        if (classes is null) return;
+        UpdateExplorerRegistration(executable: null);
+    }
 
-        RemoveExplorerMenu(classes);
-        SHChangeNotify(ShellAssociationChanged, ShellItemIdList, IntPtr.Zero, IntPtr.Zero);
+    [SupportedOSPlatform("windows")]
+    private static void UpdateExplorerRegistration(string? executable)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        using var mutex = new Mutex(false, $@"Global\OD.EditMediaInfo.ExplorerMenu.{identity.User!.Value}");
+        try
+        {
+            mutex.WaitOne();
+        }
+        catch (AbandonedMutexException)
+        {
+            /// The current process owns the mutex and can replace an interrupted registration.
+        }
+        try
+        {
+            using var classes = executable is null
+                ? Registry.CurrentUser.OpenSubKey(UserClasses, writable: true)
+                : Registry.CurrentUser.CreateSubKey(UserClasses);
+            if (classes is null)
+                return;
+
+            if (executable is null)
+                RemoveExplorerMenu(classes);
+            else
+                InstallExplorerMenu(classes, executable, FFprobeService.FindExecutable() is not null);
+            SHChangeNotify(ShellAssociationChanged, ShellItemIdList, IntPtr.Zero, IntPtr.Zero);
+        }
+        finally
+        {
+            mutex.ReleaseMutex();
+        }
     }
 
     /// <summary>Removes the legacy wildcard and any per-extension verbs outside the active set.</summary>

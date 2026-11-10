@@ -39,7 +39,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         AddReadOnly("Overview", "Media type", info.Details.Kind);
         AddReadOnly("Overview", "File", info.FilePath);
         AddReadOnly("Overview", "Container", info.Details.Container);
-        AddReadOnly("Overview", "File size", MediaProbeService.FormatSize(info.FileSize));
+        AddReadOnly("Overview", "File size", MediaSizeFormatter.FormatSize(info.FileSize));
         if (info.Duration > TimeSpan.Zero) AddReadOnly("Overview", "Duration", $"{info.Duration.TotalSeconds:0.###} s ({info.Duration})");
         if (info.AudioSampleRate > 0) AddReadOnly("Audio", "Sample rate", $"{info.AudioSampleRate} Hz");
         if (info.AudioBitrate > 0) AddReadOnly("Audio", "Audio bitrate", $"{info.AudioBitrate} kb/s");
@@ -59,10 +59,10 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         for (int index = 0; index < info.Pictures.Count; index++)
         {
             var picture = info.Pictures[index];
-            AddReadOnly("Images", $"Artwork {index + 1}", $"{picture.Type} · {picture.MimeType} · {picture.Width} × {picture.Height} · {MediaProbeService.FormatSize(picture.DataLength)} · {picture.Description}");
+            AddReadOnly("Images", $"Artwork {index + 1}", $"{picture.Type} · {picture.MimeType} · {picture.Width} × {picture.Height} · {MediaSizeFormatter.FormatSize(picture.DataLength)} · {picture.Description}");
         }
         foreach (var diagnostic in info.Details.Diagnostics) AddReadOnly("Overview", "Analysis notice", diagnostic, "Reader");
-        if (!info.Details.CanWriteTags) AddReadOnly("Overview", "Editing", "Inspection only: this file has no supported metadata writer.");
+        if (!info.Details.CanWriteTags) AddReadOnly("Overview", "Editing", "Inspection only: metadata editing is unavailable.");
     }
 
     private void Add(EditorField field)

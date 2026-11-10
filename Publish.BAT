@@ -7,10 +7,10 @@ pushd "%~dp0" || (
     exit /b 1
 )
 
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\build.ps1" %*
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0build.ps1" %*
 set "publishExitCode=%ERRORLEVEL%"
 popd
 
-if not "%publishExitCode%"=="0" echo Publish failed with exit code %publishExitCode%.
+if not "%publishExitCode%"=="0" echo CLI and GUI publication failed with exit code %publishExitCode%.
 pause
 exit /b %publishExitCode%

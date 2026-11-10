@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/OD.EditMediaInfo.Core/OD.EditMediaInfo.Core.csproj" />
     <ProjectReference Include="../../src/OD.EditMediaInfo/OD.EditMediaInfo.csproj" />
   </ItemGroup>
 
