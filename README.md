@@ -1,6 +1,6 @@
 # odmedia — Media Info Editor CLI (.NET 10 win-x64)
 
-Self-contained Windows x64 executable for inspecting audio, video, and photographs and editing supported metadata. The interactive terminal workspace uses sections, search, a current/new-value grid, and grouped saves. Photo metadata extraction is built in. Extended audio/video analysis uses optional FFprobe, installable directly from the application without administrator rights.
+Self-contained Windows x64 executable for inspecting audio, video, and photographs and editing supported metadata. The interactive terminal workspace uses sections, search, separate saved and pending values, and grouped saves. Photo metadata extraction is built in. Extended audio/video analysis uses optional FFprobe, installable directly from the application without administrator rights.
 
 ## Version 2 workspace
 
@@ -16,7 +16,7 @@ odmedia manual --lang fr --no-open
 
 Calling help extracts `odmedia-manual-en.html` and `odmedia-manual-fr.html` beside the real executable, making the language links work offline. The selected guide opens with the default HTML application unless `--no-open` is specified. The default language is French for a French system UI, otherwise English. Existing generated guides are refreshed when their embedded content changes; keep personal notes in another file. If the executable folder is protected, move odmedia.exe to a writable folder and retry. Standard `--help` continues to show command syntax.
 
-Open a file with `odmedia "path to media"`, or launch `odmedia` and paste or drag a file path. The workspace shows a short overview and only the sections relevant to that file: General, Video, Audio, Image, Capture, Location, Subtitles, Chapters, Metadata, Images, Color, and Advanced.
+Open a file with `odmedia "path to media"`, or launch `odmedia` and paste a path or drag a file into the terminal. The workspace opens in **Overview** and shows the sections relevant to the file, such as **Video**, **Audio**, **Image**, and **Metadata**.
 
 | Key | Action |
 |-----|--------|
@@ -34,7 +34,9 @@ Open a file with `odmedia "path to media"`, or launch `odmedia` and paste or dra
 | Ctrl+O | Open another file (also available in F4 Actions) |
 | Esc | Quit, with Save / Discard / Cancel when there are pending changes |
 
-To switch files, press **Ctrl+O** or choose **Open another file…** in **F4 → Actions**. Drag the next file into the terminal or enter its path, then press **Enter**. Press **Esc** at the path prompt to return to the current file. If the next file opens successfully and there are pending edits, choose **Save**, **Discard**, or **Cancel** before switching.
+To switch files, press **Ctrl+O** or choose **Open another file…** in **F4 → Actions**. Drag the next file into the terminal or enter its path, then press **Enter**. If the file cannot be opened, try another path or press **Esc** at the path prompt to return to the current file. Once the next file is ready, choose **Save**, **Discard**, or **Cancel** if there are pending edits to the current file.
+
+The editing grid separates **Saved value** and **Pending value**. Replacements are yellow, removals are red, and the selected field name is cyan. The yellow **unsaved changes** badge counts edits across sections and filters, including pending artwork changes. **Save** is highlighted in green while edits are pending. The save review shows the **Before** and **After** values.
 
 Each editable field has a **Keep**, **Replace**, or **Remove** state. Empty or whitespace-only editor input leaves its pending state unchanged; an invisible space never deletes a field. Use Delete to remove and Ctrl+Z to restore. Editors support Ctrl+A to clear input, Ctrl+Enter for multiline text, and Esc to cancel. Lists use semicolons; numeric values use a decimal point; exposure accepts fractions such as `1/125`; camera dates use `yyyy-MM-dd HH:mm:ss` without assuming a timezone.
 
@@ -75,7 +77,11 @@ odmedia explorer install
 odmedia explorer remove
 ```
 
-These actions are also available under F4. They add or remove **Inspect metadata with odmedia** for the current user, without administrator rights or changes to default file associations. The entry opens one file with a supported media extension in the interactive terminal. Additional formats such as MOV are registered when FFprobe is available. On Windows 11, the classic entry is under **Show more options**. Register from the executable's permanent location and run registration again after moving it or installing the optional analyzer. Both actions remove the previous all-files entry.
+In the interactive workspace, **F4 → Actions** offers **Add Explorer context menu** and **Remove Explorer context menu**. Registration adds **Inspect metadata with odmedia** for the current user without requiring administrator rights or changing the default apps. The command opens one selected file with a supported media extension. Additional formats such as MOV are registered when FFprobe is available.
+
+**On Windows 11**, hold **Shift** while right-clicking a media file to open the classic context menu directly, then choose **Inspect metadata with odmedia**. A regular right-click opens the modern menu. From there, select **Show more options** to reach the classic menu. The modern **App extensions** submenu, when present, shows a selection of extensions supported by that menu. The current odmedia registration is for the classic menu, so its absence from that submenu is expected. [Microsoft's File Explorer guide](https://support.microsoft.com/en-us/windows/experience/fileexplorer/file-explorer-in-windows)
+
+Register from the executable's permanent location. Register again if you move it or install the optional analyzer. Both registration and removal clear the previous all-files entry.
 
 ## Installation
 
@@ -173,8 +179,8 @@ Exit codes: `0 OK`, `1 args/file`, `2 tag error`, `130 cancelled Ctrl+C`.
 
 ### Presets
 
-* Location: `<exeDir>/presets/*.json` by default (created on demand). Set `ODMEDIA_PRESET_DIR` to use a different preset folder.
-* Interactive: file → menu `Preset — Create from this file` (multi-select checkboxes per field) / `Create from scratch` / `Apply to this file` / `Manage (list/delete)`.
+* Presets are stored in `<exeDir>/presets/*.json` by default. Set `ODMEDIA_PRESET_DIR` to share a folder between copies of odmedia.
+* For an editable audio or video file, open **F4 → Actions** and choose **Preset: create from this file**, **Preset: create from scratch**, or **Preset: stage for this file**. Staging adds pending edits that you can review and save. **Preset: manage** lists presets and lets you view their details or delete them.
 * Generic fields only: `Artist, Album, AlbumArtist, Genre, Year, Composer, Comment, Copyright, Publisher, Cover(optional)` — `Title/Track/Disc` excluded by design. `EncodedBy` not available via TagLibSharp 2.3.0 and therefore not included.
 * Cover is optional and limited to 10 MB; the interactive workflow warns when it exceeds 5 MB.
 
