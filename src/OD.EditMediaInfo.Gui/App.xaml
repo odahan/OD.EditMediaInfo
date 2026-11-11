@@ -35,6 +35,12 @@
         </Style>
         <Style x:Key="PendingValue" TargetType="TextBlock" BasedOn="{StaticResource GridValue}">
             <Setter Property="Foreground" Value="{StaticResource PendingBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                    <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
     </Application.Resources>
 </Application>

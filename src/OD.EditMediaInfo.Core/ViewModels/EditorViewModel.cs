@@ -24,7 +24,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     /// <summary>Indicates whether artwork will be replaced or removed on save.</summary>
     public bool HasPendingCoverChange => coverPath is not null || removeCover;
     public int PendingCount => Fields.Count(f => f.IsModified) + (HasPendingCoverChange ? 1 : 0);
-    public string CoverAction => removeCover ? "Remove all artwork" : coverPath is not null ? $"Replace {coverType.ToString().ToLowerInvariant()} artwork: {coverPath}" : "Keep artwork";
+    public string? PendingCoverAction => removeCover ? "Remove all artwork"
+        : coverPath is not null ? $"Replace {coverType.ToString().ToLowerInvariant()} artwork" : null;
+    public string CoverAction => coverPath is not null ? $"{PendingCoverAction}: {coverPath}" : PendingCoverAction ?? "Keep artwork";
     public string[] Sections => new[] { "Overview", "General", "Video", "Audio", "Image", "Capture", "Location", "Subtitles", "Chapters", "Metadata", "Images", "Color", "Advanced" }
         .Where(s => Fields.Any(f => f.Section == s)).ToArray();
 
@@ -106,7 +108,6 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     {
         if (!Info.Details.CanWriteTags || Info.Details.Kind == "Photo") throw new InvalidOperationException("Audio/video presets cannot be applied to this file.");
         var options = PresetService.ToEditOptions(preset, Info.FilePath);
-        if (options.CoverPath is not null) temporaryCovers.Add(options.CoverPath);
         var changes = new Dictionary<string, string?>
         {
             ["Performers"] = options.Artists is null ? null : string.Join("; ", options.Artists),
@@ -119,12 +120,42 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
             ["Copyright"] = options.Copyright,
             ["Publisher"] = options.Publisher
         };
-        foreach (var change in changes.Where(c => c.Value is not null))
+        try
         {
-            var field = Fields.First(f => f.Id == change.Key);
-            if (change.Value!.Length == 0) field.Remove(); else field.Replace(change.Value);
+            var edits = changes.Where(change => change.Value is not null)
+                .Select(change => (Field: Fields.First(field => field.Id == change.Key), Value: change.Value!))
+                .ToArray();
+            foreach (var (field, value) in edits)
+            {
+                if (!field.IsEditable)
+                    throw new InvalidOperationException($"The field \"{field.Label}\" is read-only.");
+                if (value.Length == 0 || !string.IsNullOrWhiteSpace(value))
+                    field.Definition!.Parse(value.Length == 0 ? null : value);
+            }
+            if (options.CoverPath is { } path)
+            {
+                StageCover(path, type: options.CoverType ?? CoverType.Front, description: options.CoverDescription ?? "Front Cover");
+                temporaryCovers.Add(path);
+            }
+            foreach (var (field, value) in edits)
+            {
+                if (value.Length == 0) field.Remove(); else field.Replace(value);
+            }
         }
-        if (options.CoverPath is not null) StageCover(options.CoverPath, type: options.CoverType ?? CoverType.Front, description: options.CoverDescription ?? "Front Cover");
+        catch
+        {
+            if (options.CoverPath is { } path && !temporaryCovers.Contains(path))
+                PresetService.CleanupTempCover(options);
+            throw;
+        }
+    }
+
+    /// <summary>Discards the pending artwork operation.</summary>
+    public void RevertCover()
+    {
+        coverPath = null;
+        removeCover = false;
+        OnPropertyChanged(nameof(PendingCount));
     }
 
     /// <summary>Builds one save request, preserving every field absent from the change dictionary.</summary>
@@ -144,9 +175,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public void RevertAll()
     {
         foreach (var field in Fields) field.Revert();
-        coverPath = null;
-        removeCover = false;
-        OnPropertyChanged(nameof(PendingCount));
+        RevertCover();
     }
 
     /// <summary>Deletes only cover files created for preset previews.</summary>

@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using OD.EditMediaInfo.Models;
 using OD.EditMediaInfo.ViewModels;
 using OD.EditMediaInfo.Views;
@@ -257,7 +256,8 @@ public static partial class InteractiveEditor
     private static async Task<WorkspaceAction> RunActionsAsync(EditorViewModel model, CancellationToken token)
     {
         const string openAnotherFile = "Open another file…";
-        var actions = new List<string> { openAnotherFile, "Back", "User manual", "Install media analyzer", "Add Explorer context menu", "Remove Explorer context menu", "Export complete JSON" };
+        var actions = new List<string> { openAnotherFile, "Back", "User manual", "Install media analyzer", "Add Explorer context menu",
+            "Remove Explorer context menu", "Export complete JSON", "Export CSV", "Export HTML" };
         if (model.Info.Details.Kind == "Video") actions.Add("Analyze cadence (up to 300 frames)");
         if (model.Info.Details.CanWriteTags)
         {
@@ -321,12 +321,28 @@ public static partial class InteractiveEditor
             case "Preset: manage": await HandlePresetManageAsync(); break;
             case "Artwork: extract": ExtractArtwork(model.Info); break;
             case "Export complete JSON":
-                var path = ReadInput("Export inspection", "Exports saved values only; pending changes are not included.", model.Info.FilePath + ".json");
-                if (!string.IsNullOrWhiteSpace(path) && AllowOverwrite(path))
-                    File.WriteAllText(path, JsonSerializer.Serialize(model.Info, new JsonSerializerOptions { WriteIndented = true }));
-                break;
+                ExportInspection(model.Info, MediaExportFormat.Json); break;
+            case "Export CSV":
+                ExportInspection(model.Info, MediaExportFormat.Csv); break;
+            case "Export HTML":
+                ExportInspection(model.Info, MediaExportFormat.Html); break;
         }
         return WorkspaceAction.Stay;
+    }
+
+    private static void ExportInspection(MediaInfo info, MediaExportFormat format)
+    {
+        var path = ReadInput($"Export {format.ToString().ToUpperInvariant()}", "Export the saved inspection values. Esc cancels.",
+            info.FilePath + MediaExportService.GetExtension(format))?.Trim().Trim('"');
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var exists = File.Exists(path);
+        if (exists && !AllowOverwrite(path))
+            return;
+
+        MediaExportService.Save(path, info, format, overwrite: exists);
+        ShowMessage("Inspection exported", Path.GetFullPath(path));
     }
 
     private static async Task<bool> InstallAnalyzerInteractiveAsync(CancellationToken token)

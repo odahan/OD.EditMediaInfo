@@ -8,6 +8,10 @@ Launch `odmedia-gui.exe` and select **Open…** or drop a file onto the window. 
 
 Select an editable field and use **Edit…**, double-click it, or press F2. **Remove value** stages a deletion and **Revert field** discards that field’s pending change. **Save…** opens a before-and-after review. The first save keeps the original as a `.bak` file. When switching files or closing the window, choose **Save**, **Discard**, or **Cancel** if changes are pending.
 
+On the **Metadata** tab of an editable audio or video file, use **Presets** to preview, stage, or delete a shared preset, or create one from the file’s saved tags or from scratch. Use the checkboxes to choose which tags and artwork to include when creating or staging a preset. Staged changes appear in the save review.
+
+Use **Export → JSON, CSV, or HTML** to save the inspection report from any tab, including for files opened in read-only mode. Export includes saved values across all sections. The HTML report uses a dark theme and works offline as a single file.
+
 ## Terminal workspace
 
 
@@ -122,6 +126,9 @@ Flow: file → overview → contextual sections and searchable grid → stage mu
 # Show info
 odmedia info track.mp3
 odmedia info track.mp4 --json
+odmedia info track.mp4 --export html --output report.html
+odmedia info track.mp4 --export csv --output report.csv
+odmedia info track.mp4 --export json --output report.json
 
 # Edit tags
 odmedia set track.mp3 --title "New Title" --artist "Artist" --album "Album"
@@ -192,9 +199,13 @@ Exit codes: `0 OK`, `1 args/file`, `2 tag error`, `130 cancelled Ctrl+C`.
 | Option | Description |
 |--------|-------------|
 | `--json` | Output raw JSON |
+| `--export <json\|csv\|html>` | Write the full inspection report in the chosen format |
+| `--output <path>` | Save the export to a new file. By default, export writes to standard output |
 | `--analyze-cadence` | Inspect up to 300 frames from the first video track; explicitly sampled results |
 
 Existing top-level JSON fields remain available, including the legacy audio-only `bitrate`. Extended results are additive under `details` (`Kind`, `Container`, `OverallBitrate` in bit/s, capability flags, source-labelled `Properties`, `Streams`, `Chapters` with seconds, `Diagnostics`, and the complete `ProbeData`). Track JSON retains the FFprobe field names and units.
+
+The terminal’s **F4 → Actions** menu offers all three export formats. **Export complete JSON** and `--export json` use the same full schema as the GUI. CSV contains one row per property with **Section**, **Field**, **Value**, and **Source** columns. Text resembling a spreadsheet formula is prefixed with an apostrophe.
 
 ## Build
 

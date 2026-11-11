@@ -1,6 +1,7 @@
 <Window x:Class="OD.EditMediaInfo.Gui.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:services="clr-namespace:OD.EditMediaInfo.Services;assembly=OD.EditMediaInfo.Core"
         Title="OD.EditMediaInfo" Width="1120" Height="720" MinWidth="760" MinHeight="450"
         Background="{StaticResource WindowBrush}" Foreground="{StaticResource TextBrush}"
         AllowDrop="True" PreviewDragOver="OnDragOver" Drop="OnDrop" Closing="OnClosing">
@@ -25,7 +26,17 @@
                 <Button Content="_Open…" Command="{Binding OpenCommand}" MinWidth="92" Margin="0,0,8,0" />
                 <Button Content="_Save…" Command="{Binding SaveCommand}" MinWidth="92" Margin="0,0,8,0" />
                 <Menu Background="Transparent" VerticalAlignment="Center">
-                    <MenuItem Header="E_xplorer">
+                    <MenuItem Header="E_xport">
+                        <MenuItem Header="JSON…" Command="{Binding ExportCommand}" CommandParameter="{x:Static services:MediaExportFormat.Json}" />
+                        <MenuItem Header="CSV…" Command="{Binding ExportCommand}" CommandParameter="{x:Static services:MediaExportFormat.Csv}" />
+                        <MenuItem Header="HTML…" Command="{Binding ExportCommand}" CommandParameter="{x:Static services:MediaExportFormat.Html}" />
+                    </MenuItem>
+                    <MenuItem Header="_Presets" Visibility="{Binding ShowPresetCommands, Converter={StaticResource BooleanToVisibility}}">
+                        <MenuItem Header="Browse and apply…" Command="{Binding ManagePresetsCommand}" />
+                        <MenuItem Header="Create from this file…" Command="{Binding CreatePresetFromFileCommand}" />
+                        <MenuItem Header="Create from scratch…" Command="{Binding CreatePresetCommand}" />
+                    </MenuItem>
+                    <MenuItem Header="Exp_lorer">
                         <MenuItem Header="Use this app in the context menu" Command="{Binding RegisterExplorerCommand}" />
                     </MenuItem>
                 </Menu>
@@ -77,10 +88,14 @@
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsModified}" Value="True">
                                                             <Setter Property="Foreground" Value="{StaticResource PendingBrush}" />
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsEditable}" Value="False">
                                                             <Setter Property="Text" Value="Read-only" />
                                                             <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -106,6 +121,19 @@
                              Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibility}}" />
                 <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding PendingCount, StringFormat={}{0} pending changes}" Foreground="{StaticResource MutedBrush}" />
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PendingArtwork}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="{Binding PendingArtwork}" Foreground="{StaticResource PendingBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Button Content="Revert artwork" Command="{Binding RevertArtworkCommand}" />
+                </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                 <Button Content="_Edit…" Command="{Binding EditFieldCommand}" MinWidth="80" />

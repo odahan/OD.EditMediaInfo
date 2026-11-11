@@ -12,15 +12,20 @@ root.AddArgument(fileArg);
 var infoCmd = new Command("info", "Show media technical info and tags");
 var infoFileArg = new Argument<string>("file", "Media file");
 var infoJsonOpt = new Option<bool>("--json", "Output JSON instead of tables");
+var infoExportOpt = new Option<MediaExportFormat?>("--export", "Export a full report in JSON, CSV, or HTML");
+var infoOutputOpt = new Option<string?>("--output", "Save the report to a new file instead of standard output");
 var cadenceOpt = new Option<bool>("--analyze-cadence", "Analyze timing of up to 300 frames from the first video track");
 infoCmd.AddArgument(infoFileArg);
 infoCmd.AddOption(infoJsonOpt);
+infoCmd.AddOption(infoExportOpt);
+infoCmd.AddOption(infoOutputOpt);
 infoCmd.AddOption(cadenceOpt);
-infoCmd.SetHandler((context) =>
+infoCmd.SetHandler(async context =>
 {
     var file = context.ParseResult.GetValueForArgument(infoFileArg);
     var json = context.ParseResult.GetValueForOption(infoJsonOpt);
-    return InfoCommand.RunAsync(file, json, context.ParseResult.GetValueForOption(cadenceOpt));
+    context.ExitCode = await InfoCommand.RunAsync(file, json, context.ParseResult.GetValueForOption(cadenceOpt),
+        context.ParseResult.GetValueForOption(infoExportOpt), context.ParseResult.GetValueForOption(infoOutputOpt));
 });
 
 // Set command

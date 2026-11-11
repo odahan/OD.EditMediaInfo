@@ -38,6 +38,10 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
     public string[] Sections => editor?.Sections ?? [];
     public int PendingCount => editor?.PendingCount ?? 0;
     public bool CanEditCapture => editor is not null && editor.Fields.Any(field => field.Definition is not null && !field.IsEditable);
+    public bool ShowPresetCommands => editor is not null && editor.Info.Details.CanWriteTags &&
+        editor.Info.Details.Kind != "Photo" &&
+        editor.Fields.Any(field => field.Section == SelectedSection && field.IsEditable);
+    public string? PendingArtwork => editor?.PendingCoverAction;
 
     partial void OnIsBusyChanged(bool value) => UpdateCommands();
     partial void OnSelectedFieldChanged(EditorField? value) => UpdateCommands();
@@ -47,15 +51,76 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
 
     private bool IsIdle() => !IsBusy;
     private bool CanSave() => IsIdle() && PendingCount > 0;
+    private bool CanExport() => IsIdle() && editor is not null;
     private bool CanEditField() => IsIdle() && SelectedField?.IsEditable == true;
     private bool CanRevertField() => IsIdle() && SelectedField?.IsModified == true;
     private bool CanUnlockCapture() => IsIdle() && CanEditCapture;
+    private bool CanManagePresets() => IsIdle() && ShowPresetCommands;
+    private bool CanRevertArtwork() => IsIdle() && PendingArtwork is not null;
+
+    [RelayCommand(CanExecute = nameof(CanManagePresets))]
+    private void ManagePresets()
+    {
+        dialogs.ManagePresets(preset =>
+        {
+            editor!.ApplyPreset(preset);
+            RefreshRows();
+            Status = $"Preset staged: {preset.Name}.";
+        });
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManagePresets))]
+    private void CreatePresetFromFile()
+    {
+        if (dialogs.CreatePreset(editor) is { } name)
+            Status = $"Preset saved: {name}.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManagePresets))]
+    private void CreatePreset()
+    {
+        if (dialogs.CreatePreset() is { } name)
+            Status = $"Preset saved: {name}.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRevertArtwork))]
+    private void RevertArtwork()
+    {
+        editor!.RevertCover();
+        RefreshRows();
+    }
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private async Task OpenAsync()
     {
         if (dialogs.ChooseFile() is { } path)
             await OpenFileAsync(path);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private async Task ExportAsync(MediaExportFormat format)
+    {
+        var info = editor!.Info;
+        if (dialogs.ChooseExportFile(info.FilePath, format) is not { } path)
+            return;
+
+        IsBusy = true;
+        Status = "Exporting saved inspection values…";
+        try
+        {
+            var overwrite = File.Exists(path);
+            await Task.Run(() => MediaExportService.Save(path, info, format, overwrite));
+            Status = $"Report saved: {Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            Status = "Could not export the inspection report.";
+            dialogs.ShowError("Export failed", ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
@@ -155,7 +220,7 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
     {
         var current = editor!;
         var changes = current.Fields.Where(field => field.IsModified).ToArray();
-        if (!dialogs.ReviewChanges(FileName, changes))
+        if (!dialogs.ReviewChanges(FileName, changes, PendingArtwork, current.Info.Pictures.Count))
             return false;
 
         var options = current.ToEditOptions();
@@ -272,6 +337,8 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
         Rows = editor?.VisibleFields(SelectedSection ?? "") ?? [];
         SelectedField = selected is not null && Rows.Contains(selected) ? selected : null;
         OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(PendingArtwork));
+        OnPropertyChanged(nameof(ShowPresetCommands));
         UpdateCommands();
     }
 
@@ -280,10 +347,15 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
         OpenCommand.NotifyCanExecuteChanged();
         RegisterExplorerCommand.NotifyCanExecuteChanged();
         SaveCommand.NotifyCanExecuteChanged();
+        ExportCommand.NotifyCanExecuteChanged();
         EditFieldCommand.NotifyCanExecuteChanged();
         RemoveFieldCommand.NotifyCanExecuteChanged();
         RevertFieldCommand.NotifyCanExecuteChanged();
         EnableCaptureEditingCommand.NotifyCanExecuteChanged();
+        ManagePresetsCommand.NotifyCanExecuteChanged();
+        CreatePresetFromFileCommand.NotifyCanExecuteChanged();
+        CreatePresetCommand.NotifyCanExecuteChanged();
+        RevertArtworkCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Releases the active editing session.</summary>

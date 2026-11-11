@@ -102,6 +102,28 @@ public sealed class MediaInspectionTests
         Assert.Equal(0, model.PendingCount);
     }
 
+    /// <summary>Rejects invalid presets without replacing any already staged values.</summary>
+    [Fact]
+    public void Grid_ValidatesEveryPresetFieldBeforeStaging()
+    {
+        var tags = new TagLib.Id3v2.Tag();
+        var album = new EditorField("Album", "Metadata", "Album", "Saved", "TagLibSharp", TagFieldCatalog.Find(tags, "Album"));
+        var year = new EditorField("Year", "Metadata", "Year", "", "TagLibSharp", TagFieldCatalog.Find(tags, "Year"));
+        var info = EmptyInfo("test.mp3") with { Details = new MediaDetails { Kind = "Audio", CanWriteTags = true } };
+        using var model = new EditorViewModel(info, [album, year]);
+        album.Replace("Pending");
+
+        var preset = new PresetFile { Tags = new PresetTags { Album = "From preset", Year = 10000 } };
+        Assert.Throws<ArgumentException>(() => model.ApplyPreset(preset));
+        Assert.Equal("Pending", album.Replacement);
+        Assert.False(year.IsModified);
+
+        preset.Tags.Year = 2026;
+        model.ApplyPreset(preset);
+        Assert.Equal("From preset", album.Replacement);
+        Assert.Equal("2026", year.Replacement);
+    }
+
     /// <summary>Rejects read-only edits and invalid capture settings before any file operation.</summary>
     [Fact]
     public void Grid_ValidatesCaptureValuesAndReadOnlyRows()

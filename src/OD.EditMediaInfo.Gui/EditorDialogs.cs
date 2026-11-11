@@ -1,8 +1,10 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using Microsoft.Win32;
+using OD.EditMediaInfo.Services;
 using OD.EditMediaInfo.ViewModels;
 
 namespace OD.EditMediaInfo.Gui;
@@ -10,7 +12,7 @@ namespace OD.EditMediaInfo.Gui;
 internal enum LeaveChoice { Cancel, Save, Discard }
 
 /// <summary>Shows owned dialogs for file selection, field editing, and save decisions.</summary>
-internal sealed class EditorDialogs(Window owner)
+internal sealed partial class EditorDialogs(Window owner)
 {
     public string? ChooseFile()
     {
@@ -19,6 +21,24 @@ internal sealed class EditorDialogs(Window owner)
             Title = "Open media",
             Filter = "All files (*.*)|*.*",
             CheckFileExists = true
+        };
+        return picker.ShowDialog(owner) == true ? picker.FileName : null;
+    }
+
+    /// <summary>Prompts for the location of a report in the selected format.</summary>
+    public string? ChooseExportFile(string mediaPath, MediaExportFormat format)
+    {
+        var extension = MediaExportService.GetExtension(format);
+        var label = format.ToString().ToUpperInvariant();
+        var picker = new SaveFileDialog
+        {
+            Title = $"Export {label} inspection",
+            FileName = Path.GetFileName(mediaPath) + extension,
+            InitialDirectory = Path.GetDirectoryName(mediaPath),
+            DefaultExt = extension,
+            Filter = $"{label} report (*{extension})|*{extension}",
+            AddExtension = true,
+            OverwritePrompt = true
         };
         return picker.ShowDialog(owner) == true ? picker.FileName : null;
     }
@@ -63,7 +83,7 @@ internal sealed class EditorDialogs(Window owner)
         return dialog.ShowDialog() == true;
     }
 
-    public bool ReviewChanges(string fileName, IReadOnlyList<EditorField> changes)
+    public bool ReviewChanges(string fileName, IReadOnlyList<EditorField> changes, string? pendingArtwork, int pictureCount)
     {
         var dialog = CreateDialog("Review metadata changes", 820);
         var content = new DockPanel();
@@ -71,15 +91,15 @@ internal sealed class EditorDialogs(Window owner)
         description.Margin = new Thickness(0, 0, 0, 12);
         DockPanel.SetDock(description, Dock.Top);
         content.Children.Add(description);
+        var rows = changes.Select(field => new ReviewRow(
+            $"{field.Section} / {field.Label}", field.CurrentValue,
+            field.Action == "Remove" ? "(removed)" : field.Replacement)).ToList();
+        if (pendingArtwork is not null)
+            rows.Add(new ReviewRow("Images / Artwork", $"{pictureCount} embedded image(s)", pendingArtwork));
         var grid = new DataGrid
         {
             Style = (Style)owner.FindResource("MetadataGrid"),
-            ItemsSource = changes.Select(field => new
-            {
-                Field = $"{field.Section} / {field.Label}",
-                Before = field.CurrentValue,
-                After = field.Action == "Remove" ? "(removed)" : field.Replacement
-            }),
+            ItemsSource = rows,
             MaxHeight = 340,
             MinHeight = 95,
             Margin = new Thickness(0, 0, 0, 2)
@@ -116,7 +136,7 @@ internal sealed class EditorDialogs(Window owner)
 
     private static TextBlock Message(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap };
 
-    private Window CreateDialog(string title, double width)
+    private Window CreateDialog(string title, double width, Window? parent = null)
     {
         var layout = new DockPanel { Margin = new Thickness(20) };
         var buttons = new StackPanel
@@ -130,7 +150,7 @@ internal sealed class EditorDialogs(Window owner)
 
         var dialog = new Window
         {
-            Owner = owner,
+            Owner = parent ?? owner,
             Title = title,
             Width = width,
             SizeToContent = SizeToContent.Height,
@@ -148,7 +168,7 @@ internal sealed class EditorDialogs(Window owner)
     private static void SetContent(Window dialog, UIElement content) =>
         ((DockPanel)dialog.Content).Children.Add(content);
 
-    private static void AddButton(Window dialog, string label, bool isDefault = false, bool isCancel = false, Action? action = null)
+    private static Button AddButton(Window dialog, string label, bool isDefault = false, bool isCancel = false, Action? action = null)
     {
         var button = new Button
         {
@@ -162,6 +182,7 @@ internal sealed class EditorDialogs(Window owner)
             button.Click += (_, _) => action();
         var buttons = (StackPanel)((DockPanel)dialog.Content).Children[0];
         buttons.Children.Add(button);
+        return button;
     }
 
     private void AddReviewColumn(DataGrid grid, string heading, string binding, double width, string style)
@@ -174,4 +195,6 @@ internal sealed class EditorDialogs(Window owner)
             ElementStyle = (Style)owner.FindResource(style)
         });
     }
+
+    private sealed record ReviewRow(string Field, string Before, string? After);
 }

@@ -1,85 +1,68 @@
-using System.Text.Json;
+using System.Text;
 using OD.EditMediaInfo.Services;
 using Spectre.Console;
 
 namespace OD.EditMediaInfo.Commands;
 
-/// <summary>Implements the command that displays media information.</summary>
+/// <summary>Implements the command that displays or exports media information.</summary>
 public static class InfoCommand
 {
     /// <summary>Executes the info command with parsed arguments.</summary>
-    public static Task<int> RunAsync(string file, bool json, bool analyzeCadence = false)
+    public static Task<int> RunAsync(string file, bool json, bool analyzeCadence = false,
+        MediaExportFormat? export = null, string? output = null)
     {
         if (string.IsNullOrWhiteSpace(file))
-        {
-            ErrorHandler.Fail("Missing file. Usage: odmedia info <file> [--json]");
-            return Task.FromResult(1);
-        }
+            return Fail("Missing file. Usage: odmedia info <file> [--json | --export <json|csv|html>]");
+        if (json && export.HasValue)
+            return Fail("Use either --json or --export.");
+        if (export.HasValue && !Enum.IsDefined(export.Value))
+            return Fail("Choose JSON, CSV, or HTML for --export.");
+        if (output is not null && (!export.HasValue || string.IsNullOrWhiteSpace(output)))
+            return Fail("--output requires --export and a report file path.");
 
         file = file.Trim();
         if (!File.Exists(file))
-        {
-            ErrorHandler.Fail($"File not found: \"{file}\"");
-            return Task.FromResult(1);
-        }
+            return Fail($"File not found: \"{file}\"");
 
         try
         {
-            var service = new MediaTagService();
-            var info = service.Read(file);
-            if (analyzeCadence) FFprobeService.AnalyzeCadence(file, info.Details);
+            var info = new MediaTagService().Read(file);
+            if (analyzeCadence)
+                FFprobeService.AnalyzeCadence(file, info.Details);
 
-            if (json)
+            if (export is { } format)
             {
-                var obj = new
+                if (output is null)
                 {
-                    file = info.FilePath,
-                    format = info.Format,
-                    codec = info.Codec,
-                    durationSeconds = info.Duration.TotalSeconds,
-                    bitrate = info.AudioBitrate,
-                    sampleRate = info.AudioSampleRate,
-                    channels = info.AudioChannels,
-                    bitsPerSample = info.AudioBitsPerSample,
-                    fileSize = info.FileSize,
-                    title = info.Title,
-                    artists = info.Artists,
-                    album = info.Album,
-                    albumArtists = info.AlbumArtists,
-                    genres = info.Genres,
-                    year = info.Year,
-                    track = info.Track,
-                    trackCount = info.TrackCount,
-                    disc = info.Disc,
-                    discCount = info.DiscCount,
-                    comment = info.Comment,
-                    composers = info.Composers,
-                    copyright = info.Copyright,
-                    publisher = info.Publisher,
-                    pictures = info.Pictures,
-                    details = info.Details
-                };
-                Console.WriteLine(JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true }));
+                    Console.OutputEncoding = new UTF8Encoding(false);
+                    MediaExportService.Write(Console.Out, info, format);
+                }
+                else
+                    MediaExportService.Save(output, info, format);
             }
+            else if (json)
+                MediaExportService.WriteLegacyInfoJson(Console.Out, info);
             else
-            {
                 MediaProbeService.Render(info);
-            }
 
             return Task.FromResult(0);
         }
         catch (Exception ex)
         {
-            ErrorHandler.Fail(ex.Message, 2);
-            return Task.FromResult(2);
+            return Fail(ex.Message, 2);
         }
+    }
+
+    private static Task<int> Fail(string message, int exitCode = 1)
+    {
+        Console.Error.WriteLine($"Error: {message}");
+        return Task.FromResult(exitCode);
     }
 
     /// <summary>Writes the info command help text.</summary>
     public static void PrintHelp()
     {
-        AnsiConsole.WriteLine("Usage: odmedia info <file> [--json]");
-        AnsiConsole.WriteLine("  Show media technical info and tags.");
-        AnsiConsole.WriteLine("  --json  Output JSON instead of tables");
+        AnsiConsole.WriteLine("Usage: odmedia info <file> [--json | --export <json|csv|html> [--output <path>]]");
+        AnsiConsole.WriteLine("  Show or export media technical information and tags.");
     }
 }
