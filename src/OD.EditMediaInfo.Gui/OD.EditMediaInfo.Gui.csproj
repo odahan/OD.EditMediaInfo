@@ -7,7 +7,7 @@
     <AssemblyName>odmedia-gui</AssemblyName>
     <ApplicationIcon>../Assets/odmedia.ico</ApplicationIcon>
     <Product>OD.EditMediaInfo</Product>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>

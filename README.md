@@ -1,6 +1,6 @@
 # OD.EditMediaInfo — Media metadata editor for Windows
 
-OD.EditMediaInfo 3.0.0 ships two self-contained Windows x64 executables. Use `odmedia-gui.exe` for the graphical workspace and `odmedia.exe` for the CLI and interactive terminal. Both can inspect audio, video, and photographs and edit supported metadata. Photo inspection is built in. Optional FFprobe adds audio and video analysis.
+OD.EditMediaInfo 3.0.1 ships two self-contained Windows x64 executables. Use `odmedia-gui.exe` for the graphical workspace and `odmedia.exe` for the CLI and interactive terminal. Both can inspect audio, video, and photographs and edit supported metadata. Photo inspection is built in. Optional FFprobe adds audio and video analysis.
 
 ## Graphical workspace
 
