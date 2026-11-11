@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:services="clr-namespace:OD.EditMediaInfo.Services;assembly=OD.EditMediaInfo.Core"
         Title="OD.EditMediaInfo" Width="1120" Height="720" MinWidth="760" MinHeight="450"
+        Icon="/Assets/odmedia.ico"
         Background="{StaticResource WindowBrush}" Foreground="{StaticResource TextBrush}"
         AllowDrop="True" PreviewDragOver="OnDragOver" Drop="OnDrop" Closing="OnClosing">
     <Window.Resources>
@@ -58,58 +59,92 @@
                     Visibility="{Binding CanEditCapture, Converter={StaticResource BooleanToVisibility}}" />
         </DockPanel>
 
-        <TabControl Grid.Row="2" ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
-                    AutomationProperties.Name="Media sections">
-            <TabControl.ContentTemplate>
-                <DataTemplate>
-                    <DataGrid DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
-                              Style="{StaticResource MetadataGrid}" ItemsSource="{Binding Rows}"
-                              SelectedItem="{Binding SelectedField, Mode=TwoWay}" MouseDoubleClick="OnGridDoubleClick"
-                              AutomationProperties.Name="Metadata fields">
-                        <DataGrid.InputBindings>
-                            <KeyBinding Key="F2" Command="{Binding EditFieldCommand}" />
-                        </DataGrid.InputBindings>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Section" Binding="{Binding Section}" Width="110" ElementStyle="{StaticResource GridValue}" />
-                            <DataGridTextColumn Header="Field" Binding="{Binding Label}" Width="1.4*" ElementStyle="{StaticResource GridValue}" />
-                            <DataGridTextColumn Header="Saved value" Binding="{Binding CurrentValue}" Width="2*" ElementStyle="{StaticResource GridValue}" />
-                            <DataGridTextColumn Header="Pending value" Binding="{Binding Replacement}" Width="1.5*" ElementStyle="{StaticResource PendingValue}" />
-                            <DataGridTemplateColumn Header="State" Width="96" SortMemberPath="Action">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock>
+        <DockPanel Grid.Row="2">
+            <Border DockPanel.Dock="Right" Width="184" Margin="16,0,0,0" Padding="10"
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="6" Visibility="{Binding HasThumbnails, Converter={StaticResource BooleanToVisibility}}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Preview" FontWeight="SemiBold" Margin="0,0,0,10" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Thumbnails}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,12">
+                                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                        <Image Source="{Binding Image}" MaxHeight="152" Stretch="Uniform"
+                                               StretchDirection="DownOnly" AutomationProperties.Name="{Binding Label}" />
+                                        <TextBlock Text="Preview unavailable" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap">
                                             <TextBlock.Style>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource GridValue}">
-                                                    <Setter Property="Text" Value="{Binding Action}" />
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Action}" Value="Keep">
-                                                            <Setter Property="Text" Value="Editable" />
-                                                            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding IsModified}" Value="True">
-                                                            <Setter Property="Foreground" Value="{StaticResource PendingBrush}" />
-                                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding IsEditable}" Value="False">
-                                                            <Setter Property="Text" Value="Read-only" />
-                                                            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
-                                                            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}" />
+                                                        <DataTrigger Binding="{Binding Image}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="110" ElementStyle="{StaticResource GridValue}" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </DataTemplate>
-            </TabControl.ContentTemplate>
-        </TabControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+            <TabControl ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
+                        AutomationProperties.Name="Media sections">
+                <TabControl.ContentTemplate>
+                    <DataTemplate>
+                        <DataGrid DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  Style="{StaticResource MetadataGrid}" ItemsSource="{Binding Rows}"
+                                  SelectedItem="{Binding SelectedField, Mode=TwoWay}" MouseDoubleClick="OnGridDoubleClick"
+                                  AutomationProperties.Name="Metadata fields">
+                            <DataGrid.InputBindings>
+                                <KeyBinding Key="F2" Command="{Binding EditFieldCommand}" />
+                            </DataGrid.InputBindings>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Section" Binding="{Binding Section}" Width="110" ElementStyle="{StaticResource GridValue}" />
+                                <DataGridTextColumn Header="Field" Binding="{Binding Label}" Width="1.4*" ElementStyle="{StaticResource GridValue}" />
+                                <DataGridTextColumn Header="Saved value" Binding="{Binding CurrentValue}" Width="2*" ElementStyle="{StaticResource GridValue}" />
+                                <DataGridTextColumn Header="Pending value" Binding="{Binding Replacement}" Width="1.5*" ElementStyle="{StaticResource PendingValue}" />
+                                <DataGridTemplateColumn Header="State" Width="96" SortMemberPath="Action">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock>
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridValue}">
+                                                        <Setter Property="Text" Value="{Binding Action}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Action}" Value="Keep">
+                                                                <Setter Property="Text" Value="Editable" />
+                                                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsModified}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource PendingBrush}" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsEditable}" Value="False">
+                                                                <Setter Property="Text" Value="Read-only" />
+                                                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="110" ElementStyle="{StaticResource GridValue}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DataTemplate>
+                </TabControl.ContentTemplate>
+            </TabControl>
+        </DockPanel>
 
         <Grid Grid.Row="3" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>

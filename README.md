@@ -6,6 +6,8 @@ OD.EditMediaInfo 3.0.0 ships two self-contained Windows x64 executables. Use `od
 
 Launch `odmedia-gui.exe` and select **Open…** or drop a file onto the window. Select a section tab to browse its fields. **Search fields** and **Pending only** work across sections.
 
+The **Preview** pane shows the photo or embedded artwork beside the grid. Artwork from presets also has a preview, and staged artwork appears alongside the saved images until you save or revert it. Preview availability depends on the image codecs installed in Windows.
+
 Select an editable field and use **Edit…**, double-click it, or press F2. **Remove value** stages a deletion and **Revert field** discards that field’s pending change. **Save…** opens a before-and-after review. The first save keeps the original as a `.bak` file. When switching files or closing the window, choose **Save**, **Discard**, or **Cancel** if changes are pending.
 
 On the **Metadata** tab of an editable audio or video file, use **Presets** to preview, stage, or delete a shared preset, or create one from the file’s saved tags or from scratch. Use the checkboxes to choose which tags and artwork to include when creating or staging a preset. Staged changes appear in the save review.

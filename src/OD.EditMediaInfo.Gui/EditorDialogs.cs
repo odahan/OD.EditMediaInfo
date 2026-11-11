@@ -152,6 +152,7 @@ internal sealed partial class EditorDialogs(Window owner)
         {
             Owner = parent ?? owner,
             Title = title,
+            Icon = owner.Icon,
             Width = width,
             SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,

@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AssemblyName>odmedia-gui</AssemblyName>
+    <ApplicationIcon>../Assets/odmedia.ico</ApplicationIcon>
     <Product>OD.EditMediaInfo</Product>
     <Version>3.0.0</Version>
     <SelfContained>true</SelfContained>
@@ -15,5 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../OD.EditMediaInfo.Core/OD.EditMediaInfo.Core.csproj" />
+    <Resource Include="../Assets/odmedia.ico" Link="Assets/odmedia.ico" />
   </ItemGroup>
 </Project>

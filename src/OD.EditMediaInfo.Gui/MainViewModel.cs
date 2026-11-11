@@ -1,6 +1,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using OD.EditMediaInfo.Models;
 using OD.EditMediaInfo.Services;
 using OD.EditMediaInfo.ViewModels;
 
@@ -11,6 +12,8 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
 {
     private readonly MediaTagService media = new();
     private EditorViewModel? editor;
+    private IReadOnlyList<MediaThumbnail> savedThumbnails = [];
+    private MediaThumbnail? pendingThumbnail;
 
     [ObservableProperty]
     private bool isBusy;
@@ -42,6 +45,10 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
         editor.Info.Details.Kind != "Photo" &&
         editor.Fields.Any(field => field.Section == SelectedSection && field.IsEditable);
     public string? PendingArtwork => editor?.PendingCoverAction;
+    public bool HasThumbnails => savedThumbnails.Count > 0 || pendingThumbnail is not null;
+    public IEnumerable<MediaThumbnail> Thumbnails => pendingThumbnail is { } pending
+        ? savedThumbnails.Append(pending)
+        : savedThumbnails;
 
     partial void OnIsBusyChanged(bool value) => UpdateCommands();
     partial void OnSelectedFieldChanged(EditorField? value) => UpdateCommands();
@@ -59,20 +66,35 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
     private bool CanRevertArtwork() => IsIdle() && PendingArtwork is not null;
 
     [RelayCommand(CanExecute = nameof(CanManagePresets))]
-    private void ManagePresets()
+    private async Task ManagePresetsAsync()
     {
+        PresetCover? stagedCover = null;
         dialogs.ManagePresets(preset =>
         {
             editor!.ApplyPreset(preset);
+            stagedCover = preset.Cover;
             RefreshRows();
             Status = $"Preset staged: {preset.Name}.";
         });
+        if (stagedCover is { } cover)
+        {
+            IsBusy = true;
+            try
+            {
+                pendingThumbnail = new("Pending artwork", await Task.Run(() => ThumbnailService.ReadPresetCover(cover)));
+                NotifyThumbnailsChanged();
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanManagePresets))]
     private void CreatePresetFromFile()
     {
-        if (dialogs.CreatePreset(editor) is { } name)
+        if (dialogs.CreatePreset(editor, savedThumbnails.FirstOrDefault()?.Image) is { } name)
             Status = $"Preset saved: {name}.";
     }
 
@@ -87,6 +109,8 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
     private void RevertArtwork()
     {
         editor!.RevertCover();
+        pendingThumbnail = null;
+        NotifyThumbnailsChanged();
         RefreshRows();
     }
 
@@ -155,7 +179,8 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
         {
             IsBusy = true;
             Status = "Inspecting media…";
-            candidate = await Task.Run(() => ReadEditor(path));
+            IReadOnlyList<MediaThumbnail> previews;
+            (candidate, previews) = await Task.Run(() => ReadEditor(path));
             bool reopenAfterSave = PendingCount > 0 &&
                 string.Equals(candidate.Info.FilePath, FilePath, StringComparison.OrdinalIgnoreCase);
 
@@ -169,10 +194,10 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
             if (reopenAfterSave && PendingCount == 0)
             {
                 candidate.Dispose();
-                candidate = await Task.Run(() => ReadEditor(path));
+                (candidate, previews) = await Task.Run(() => ReadEditor(path));
             }
 
-            SetEditor(candidate);
+            SetEditor(candidate, previews);
             candidate = null;
             Status = editor!.Info.Details.CanWriteTags ? "File opened." : "File opened for inspection only.";
         }
@@ -238,10 +263,10 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
 
         try
         {
-            var updated = await Task.Run(() => ReadEditor(options.FilePath));
+            var (updated, previews) = await Task.Run(() => ReadEditor(options.FilePath));
             if (current.Fields.Any(field => field.Section is "Capture" or "Location" && field.IsEditable))
                 EnableCaptureFields(updated);
-            SetEditor(updated, preserveFilters: true);
+            SetEditor(updated, previews, preserveFilters: true);
             Status = "Metadata saved.";
         }
         catch (Exception ex)
@@ -253,7 +278,7 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
         return true;
     }
 
-    private EditorViewModel ReadEditor(string path)
+    private (EditorViewModel Editor, IReadOnlyList<MediaThumbnail> Thumbnails) ReadEditor(string path)
     {
         var info = media.Read(path);
         if ((File.GetAttributes(info.FilePath) & FileAttributes.ReadOnly) != 0)
@@ -262,7 +287,7 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
             info.Details.CanWritePhoto = false;
             info.Details.Diagnostics.Add("Windows marks this file as read-only.");
         }
-        return new EditorViewModel(info);
+        return (new EditorViewModel(info), ThumbnailService.ReadSaved(info));
     }
 
     [RelayCommand(CanExecute = nameof(CanEditField))]
@@ -307,11 +332,14 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
             field.EnableCaptureEditing();
     }
 
-    private void SetEditor(EditorViewModel? value, bool preserveFilters = false)
+    private void SetEditor(EditorViewModel? value, IReadOnlyList<MediaThumbnail>? previews = null, bool preserveFilters = false)
     {
         var section = preserveFilters ? SelectedSection : null;
         editor?.Dispose();
         editor = value;
+        savedThumbnails = previews ?? [];
+        pendingThumbnail = null;
+        NotifyThumbnailsChanged();
         SelectedField = null;
         if (!preserveFilters)
         {
@@ -324,6 +352,12 @@ internal sealed partial class MainViewModel(EditorDialogs dialogs) : ObservableO
         OnPropertyChanged(nameof(CanEditCapture));
         SelectedSection = Sections.Contains(section) ? section : Sections.FirstOrDefault();
         RefreshRows();
+    }
+
+    private void NotifyThumbnailsChanged()
+    {
+        OnPropertyChanged(nameof(Thumbnails));
+        OnPropertyChanged(nameof(HasThumbnails));
     }
 
     private void RefreshRows()

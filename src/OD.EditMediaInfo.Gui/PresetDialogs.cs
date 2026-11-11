@@ -5,6 +5,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using OD.EditMediaInfo.Models;
 using OD.EditMediaInfo.Services;
@@ -149,7 +150,10 @@ internal sealed partial class EditorDialogs
                         selectedFields.Add((field, AddChoice(field.Label, value.Length == 0 ? "(remove)" : value)));
                 }
                 if (selected.Cover is { } cover)
+                {
                     includeCover = AddChoice("Artwork", $"{cover.Type} · {cover.MimeType} · {PresetService.GetCoverByteLength(cover) / 1024} KiB");
+                    choices.Children.Add(CreateArtworkPreview(() => ThumbnailService.ReadPresetCover(cover)));
+                }
                 UpdateApply();
                 status.Text = apply.IsEnabled ? "Choose what to apply." : "This preset has no changes.";
             }
@@ -175,7 +179,7 @@ internal sealed partial class EditorDialogs
     }
 
     /// <summary>Creates a preset from entered values or values saved in the current media file.</summary>
-    public string? CreatePreset(EditorViewModel? source = null)
+    public string? CreatePreset(EditorViewModel? source = null, BitmapSource? embeddedPreview = null)
     {
         var dialog = CreateDialog(source is null ? "Create preset" : "Create preset from this file", 610);
         var form = new StackPanel();
@@ -212,6 +216,7 @@ internal sealed partial class EditorDialogs
 
         string? coverPath = null;
         var coverLabel = Message("");
+        var preview = new ContentControl();
         var browse = new Button { Content = "_Choose image…", HorizontalAlignment = HorizontalAlignment.Left };
         browse.Click += (_, _) =>
         {
@@ -224,14 +229,21 @@ internal sealed partial class EditorDialogs
             {
                 coverPath = picker.FileName;
                 coverLabel.Text = Path.GetFileName(coverPath);
+                RefreshPreview();
             }
         };
         var imagePicker = new StackPanel { Visibility = artwork.SelectedItem is "Image file" ? Visibility.Visible : Visibility.Collapsed };
         imagePicker.Children.Add(browse);
         imagePicker.Children.Add(coverLabel);
         artwork.SelectionChanged += (_, _) =>
+        {
             imagePicker.Visibility = artwork.SelectedItem is "Image file" ? Visibility.Visible : Visibility.Collapsed;
+            RefreshPreview();
+        };
+        includeArtwork.Checked += (_, _) => RefreshPreview();
+        includeArtwork.Unchecked += (_, _) => RefreshPreview();
         artworkOptions.Children.Add(imagePicker);
+        artworkOptions.Children.Add(preview);
 
         var error = Message("");
         error.Foreground = (Brush)owner.FindResource("ErrorBrush");
@@ -286,6 +298,42 @@ internal sealed partial class EditorDialogs
         dialog.Loaded += (_, _) => name.Focus();
         SetContent(dialog, layout);
         return dialog.ShowDialog() == true ? savedName : null;
+
+        void RefreshPreview()
+        {
+            preview.Content = (includeArtwork.IsChecked == true ? artwork.SelectedItem : null) switch
+            {
+                "First embedded image" => CreateArtworkPreview(() => embeddedPreview),
+                "Image file" when coverPath is { } path => CreateArtworkPreview(() => ThumbnailService.ReadFile(path)),
+                _ => null
+            };
+        }
+    }
+
+    private static FrameworkElement CreateArtworkPreview(Func<BitmapSource?> read)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 4, 0, 8) };
+        var image = new Image
+        {
+            MaxWidth = 160,
+            MaxHeight = 136,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Stretch = Stretch.Uniform,
+            StretchDirection = StretchDirection.DownOnly
+        };
+        AutomationProperties.SetName(image, "Artwork preview");
+        var status = Message("Loading preview…");
+        panel.Children.Add(status);
+        panel.Children.Add(image);
+        _ = LoadPreviewAsync();
+        return panel;
+
+        async Task LoadPreviewAsync()
+        {
+            image.Source = await Task.Run(read);
+            status.Text = "Preview unavailable";
+            status.Visibility = image.Source is null ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 
     private bool ConfirmPresetAction(Window parent, string title, string prompt, string label)

@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AssemblyName>odmedia</AssemblyName>
+    <ApplicationIcon>../Assets/odmedia.ico</ApplicationIcon>
     <Product>OD.EditMediaInfo</Product>
     <Copyright>© 2026 Olivier Dahan</Copyright>
     <RepositoryUrl>https://github.com/odahan/OD.EditMediaInfo</RepositoryUrl>
